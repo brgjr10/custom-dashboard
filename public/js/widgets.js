@@ -78,6 +78,14 @@ function convertTemp(celsius) {
   return Math.round(celsius);
 }
 
+function convertWindSpeed(kmh) {
+  const unit = (typeof getUnit === 'function' ? getUnit() : 'C');
+  if (unit === 'F') {
+    return (kmh * 0.621371).toFixed(1);
+  }
+  return kmh;
+}
+
 class LinksWidget extends Widget {
   async fetchData() {
     return { links: this.config.links || [], updated: Date.now() };
@@ -610,7 +618,7 @@ class WeatherWidget extends Widget {
       <div class="weather-display">
         <div class="weather-icon">${icon}</div>
         <div class="weather-temp">${temp}°${unit}</div>
-        <div class="weather-wind"><i class="fa-solid fa-wind"></i> ${data.windspeed} km/h</div>
+        <div class="weather-wind"><i class="fa-solid fa-wind"></i> ${convertWindSpeed(data.windspeed)} ${unit === 'F' ? 'mph' : 'km/h'}</div>
       </div>
     `;
   }
