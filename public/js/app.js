@@ -462,6 +462,18 @@ function setupEventListeners() {
     });
   }
 
+  const resetBtn = document.getElementById('reset-layout-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      const confirmed = await showConfirm('Reset Defaults', 'Clear all settings and layout? This cannot be undone.');
+      if (!confirmed) return;
+      localStorage.removeItem('dashboard-config');
+      localStorage.removeItem('dashboard-theme');
+      localStorage.removeItem('dashboard-unit');
+      location.reload();
+    });
+  }
+
   if (saveLayoutBtn) {
     saveLayoutBtn.addEventListener('click', () => {
       editMode = false;
