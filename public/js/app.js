@@ -825,17 +825,6 @@ document.getElementById('emoji-picker')?.addEventListener('click', (e) => {
   }
 });
 
-document.getElementById('fa-icon-picker')?.addEventListener('click', (e) => {
-  const faOption = e.target.closest('.fa-icon-option');
-  if (!faOption) return;
-  
-  const icon = faOption.dataset.icon || '';
-  if (icon && currentEmojiField !== null && currentLinks[currentEmojiField]) {
-    currentLinks[currentEmojiField].icon = icon;
-    renderLinkEditorList();
-  }
-});
-
 document.addEventListener('click', (e) => {
   const picker = document.getElementById('emoji-picker');
   const emojiBtn = e.target.closest('.emoji-picker-btn');
