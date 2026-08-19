@@ -12,4 +12,4 @@ services:
       - /:/hostfs:ro
     environment:
       - NODE_ENV=production
-      - GITHUB_TOKEN=your_github_token_here
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
