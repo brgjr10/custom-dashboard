@@ -113,7 +113,7 @@ Global settings (theme, unit, refresh rate) persist in `localStorage`.
 
 ## Theme showcase
 
-All 12 themes rendered side-by-side: [`public/showcase.html`](/showcase.html)
+All 12 themes rendered side-by-side: [`public/showcase.html`](public/showcase.html)
 
 ## Tech stack
 
