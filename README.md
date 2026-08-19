@@ -124,4 +124,4 @@ All 12 themes rendered side-by-side: [`public/showcase.html`](/showcase.html)
 
 ## License
 
-MIT
+[MIT](/LICENSE)
