@@ -1072,22 +1072,178 @@ body {
 
 @media (max-width: 768px) {
   .dashboard {
-    padding: 16px;
+    padding: 12px;
   }
+
   .dashboard-header {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
     gap: 12px;
+    padding: 16px;
   }
+
+  .header-center {
+    text-align: center;
+  }
+
+  .datetime-date {
+    font-size: 1rem;
+  }
+
+  .datetime-time {
+    font-size: 2.5rem;
+  }
+
   .header-right {
     width: 100%;
-    flex-wrap: wrap;
+    justify-content: flex-end;
   }
+
+  .settings-panel {
+    position: static;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    box-shadow: none;
+    border-radius: var(--radius-sm);
+    margin-top: 8px;
+  }
+
+  .settings-panel button,
+  .settings-panel select {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+    font-size: 1rem;
+  }
+
+  .widget-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .widget {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    padding: 12px;
+  }
+
+  .widget-title {
+    font-size: 0.875rem;
+  }
+
+  .btn {
+    padding: 12px 16px;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  .theme-select,
+  .unit-toggle {
+    padding: 10px 12px;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  .link-item {
+    padding: 16px 12px;
+  }
+
+  .link-icon {
+    font-size: 1.75rem;
+  }
+
+  .link-label {
+    font-size: 0.875rem;
+  }
+
+  .docker-action {
+    padding: 8px 12px;
+    font-size: 0.875rem;
+    min-height: 40px;
+  }
+
+  .temp-display {
+    font-size: 2rem;
+  }
+
+  .weather-icon {
+    font-size: 2.5rem;
+  }
+
+  .weather-temp {
+    font-size: 1.5rem;
+  }
+
+  .speed-number {
+    font-size: 2rem;
+  }
+
   .add-widget-panel {
-    width: calc(100% - 32px);
-    right: 16px;
-    left: 16px;
-    bottom: 16px;
+    width: calc(100% - 24px);
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 8px;
+  }
+
+  .dashboard-header {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .datetime-time {
+    font-size: 2rem;
+  }
+
+  .widget {
+    padding: 10px;
+  }
+
+  .btn {
+    padding: 10px 12px;
+    font-size: 0.875rem;
+    min-height: 40px;
+  }
+
+  .theme-select,
+  .unit-toggle {
+    padding: 8px 10px;
+    font-size: 0.875rem;
+    min-height: 40px;
+  }
+
+  .docker-action {
+    padding: 6px 10px;
+    font-size: 0.75rem;
+    min-height: 36px;
+  }
+
+  .temp-display {
+    font-size: 1.75rem;
+  }
+
+  .weather-icon {
+    font-size: 2rem;
+  }
+
+  .weather-temp {
+    font-size: 1.25rem;
+  }
+
+  .speed-number {
+    font-size: 1.75rem;
+  }
+
+  .add-widget-panel {
+    width: calc(100% - 16px);
+    right: 8px;
+    left: 8px;
+    bottom: 8px;
   }
 }
 
