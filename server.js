@@ -899,6 +899,33 @@ app.get('/api/docker/:id/stats', async (req, res) => {
   }
 });
 
+const CONFIG_PATH = path.join(__dirname, 'public', 'data', 'config.json');
+
+app.get('/api/config', (req, res) => {
+  try {
+    if (!fs.existsSync(CONFIG_PATH)) {
+      return res.status(404).json({ error: 'No server config found' });
+    }
+    const data = fs.readFileSync(CONFIG_PATH, 'utf8');
+    res.json(JSON.parse(data));
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to read config' });
+  }
+});
+
+app.post('/api/config', express.json(), (req, res) => {
+  try {
+    const payload = req.body;
+    if (!payload || typeof payload !== 'object') {
+      return res.status(400).json({ error: 'Invalid config payload' });
+    }
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(payload, null, 2), 'utf8');
+    res.json({ status: 'ok' });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to write config' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Dashboard running at http://localhost:${PORT}`);
 });

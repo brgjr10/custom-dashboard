@@ -186,22 +186,26 @@ export function loadConfig() {
 
 export async function loadConfigAsync() {
   try {
+    const response = await fetch('/api/config');
+    if (response.ok) {
+      const serverConfig = await response.json();
+      config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+      Object.assign(config, serverConfig);
+      migrateLayoutToGrid();
+      ensureConfigDefaults();
+      saveConfig();
+      return;
+    }
+  } catch (e) {
+    // Ignore
+  }
+  try {
     const saved = localStorage.getItem('dashboard-config');
     if (saved) {
       config = JSON.parse(saved);
       migrateLayoutToGrid();
-      if (!config.theme) {
-        config.theme = 'dark';
-        saveConfig();
-      }
-      if (!config.unit) {
-        config.unit = 'C';
-        saveConfig();
-      }
-      if (!config.refreshInterval) {
-        config.refreshInterval = 30000;
-        saveConfig();
-      }
+      ensureConfigDefaults();
+      saveConfig();
       return;
     }
   } catch (e) {
@@ -213,15 +217,7 @@ export async function loadConfigAsync() {
       const fileConfig = await response.json();
       config = JSON.parse(JSON.stringify(fileConfig));
       migrateLayoutToGrid();
-      if (!config.theme) {
-        config.theme = 'dark';
-      }
-      if (!config.unit) {
-        config.unit = 'C';
-      }
-      if (!config.refreshInterval) {
-        config.refreshInterval = 30000;
-      }
+      ensureConfigDefaults();
       saveConfig();
       return;
     }
@@ -229,6 +225,19 @@ export async function loadConfigAsync() {
     // Ignore
   }
   loadConfig();
+}
+
+function ensureConfigDefaults() {
+  if (!config) return;
+  if (!config.theme) {
+    config.theme = 'dark';
+  }
+  if (!config.unit) {
+    config.unit = 'C';
+  }
+  if (!config.refreshInterval) {
+    config.refreshInterval = 30000;
+  }
 }
 
 export function migrateLayoutToGrid() {
@@ -294,6 +303,15 @@ export function saveConfig() {
     localStorage.setItem('dashboard-config', JSON.stringify(config));
   } catch (e) {
     console.warn('Could not save config to localStorage');
+  }
+  try {
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config)
+    }).catch(() => {});
+  } catch (e) {
+    // Ignore server sync errors
   }
 }
 
