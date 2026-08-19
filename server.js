@@ -441,19 +441,40 @@ app.get('/api/speedtest', async (req, res) => {
     { url: 'https://cachefly.cachefly.net/10mb.test', size: 10 }
   ];
 
+  let download = null;
+  let upload = null;
+  let duration = null;
+  let usedUrl = null;
+
   for (const test of testUrls) {
     try {
       const speed = await runSpeedTest(test.url, test.size);
-      if (speed) {
-        return res.json({
-          download: speed.mbps,
-          duration: speed.duration.toFixed(2),
-          url: test.url
-        });
-      }
+      download = speed.mbps;
+      duration = speed.duration;
+      usedUrl = test.url;
+      break;
     } catch (e) {
       continue;
     }
+  }
+
+  if (usedUrl) {
+    try {
+      const upSpeed = await runUploadTest(usedUrl, 10);
+      upload = upSpeed.mbps;
+      if (!duration) duration = upSpeed.duration;
+    } catch (e) {
+      // Upload test failed, continue without it
+    }
+  }
+
+  if (download) {
+    return res.json({
+      download,
+      upload,
+      duration: duration ? duration.toFixed(2) : null,
+      url: usedUrl
+    });
   }
 
   res.json({
@@ -498,6 +519,47 @@ function runSpeedTest(url, expectedSizeMB) {
       clearTimeout(timeout);
       reject(err);
     });
+  });
+}
+
+function runUploadTest(url, sizeMB) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timeout = setTimeout(() => {
+      reject(new Error('Timeout'));
+    }, 20000);
+
+    const data = Buffer.alloc(sizeMB * 1024 * 1024);
+    const parsed = new URL(url);
+    const req = https.request({
+      hostname: parsed.hostname,
+      path: parsed.pathname,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': data.length
+      }
+    }, (response) => {
+      clearTimeout(timeout);
+      const duration = (Date.now() - start) / 1000;
+      if (duration < 0.3) {
+        return reject(new Error('Too fast'));
+      }
+      const bits = data.length * 8;
+      const mbps = bits / duration / 1000000;
+      resolve({
+        mbps: mbps.toFixed(2),
+        duration
+      });
+    });
+
+    req.on('error', (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+
+    req.write(data);
+    req.end();
   });
 }
 

@@ -878,14 +878,39 @@ body {
   padding: 16px;
 }
 
+.speed-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.speed-item {
+  text-align: center;
+}
+
+.speed-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.speed-label i {
+  font-size: 0.875rem;
+  color: var(--accent-blue);
+}
+
 .speed-number {
-  font-size: 2.5rem;
+  font-size: 1.75rem;
   font-weight: 700;
   color: var(--accent-green);
 }
 
 .speed-unit {
-  font-size: 1rem;
+  font-size: 0.875rem;
   color: var(--text-secondary);
 }
 
@@ -1197,15 +1222,11 @@ body {
   }
 
   .speed-number {
-    font-size: 2rem;
-  }
-
-  .system-icon {
     font-size: 1.5rem;
   }
 
-  .speed-icon {
-    font-size: 1.75rem;
+  .speed-grid {
+    gap: 8px;
   }
 
   .add-widget-panel {
@@ -1266,7 +1287,15 @@ body {
   }
 
   .speed-number {
-    font-size: 1.75rem;
+    font-size: 1.25rem;
+  }
+
+  .speed-grid {
+    gap: 6px;
+  }
+
+  .speed-label {
+    font-size: 0.7rem;
   }
 
   .add-widget-panel {

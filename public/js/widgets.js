@@ -110,7 +110,7 @@ class SystemWidget extends Widget {
   }
 
   format(data) {
-    let html = '<div class="system-icon"><i class="fa-solid fa-server"></i></div>';
+    let html = '';
     const unit = getUnit();
     
     if (data.temp) {
@@ -511,14 +511,25 @@ class SpeedtestWidget extends Widget {
         </div>
       `;
     }
+    const download = data.download ? `${data.download} Mbps` : 'N/A';
+    const upload = data.upload ? `${data.upload} Mbps` : 'N/A';
     return `
       <div class="speed-value">
-        <div class="speed-icon"><i class="fa-solid fa-gauge-high"></i></div>
-        <div class="speed-number">${data.download}</div>
-        <div class="speed-unit">Mbps</div>
+        <div class="speed-grid">
+          <div class="speed-item">
+            <div class="speed-label"><i class="fa-solid fa-download"></i> Download</div>
+            <div class="speed-number">${data.download || 'N/A'}</div>
+            <div class="speed-unit">Mbps</div>
+          </div>
+          <div class="speed-item">
+            <div class="speed-label"><i class="fa-solid fa-upload"></i> Upload</div>
+            <div class="speed-number">${data.upload || 'N/A'}</div>
+            <div class="speed-unit">Mbps</div>
+          </div>
+        </div>
       </div>
       <div style="text-align: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
-        Test completed in ${data.duration}s
+        Test completed in ${data.duration ? data.duration + 's' : 'N/A'}
       </div>
     `;
   }
