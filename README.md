@@ -43,10 +43,10 @@ npm run dev
 ## Architecture
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Browser   │────▶│  server.js   │────▶│  Local APIs  │
-│  widgets.js │◀────│  Express API │◀────│  /sys, /dock │
-│  config.js  │     │  Static files│     └──────────────┘
+┌─────────────┐     ┌─────────────┐      ┌──────────────┐
+│   Browser   │──▶│  server.js   │───▶│  Local APIs  │
+│  widgets.js │◀──│  Express API │◀───│  /sys, /dock │
+│  config.js  │     │ Static files│      └──────────────┘
 └─────────────┘     └──────┬──────┘
                            │
                     ┌──────▼──────┐
