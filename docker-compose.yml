@@ -14,3 +14,5 @@ services:
     environment:
       - NODE_ENV=production
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - AUTH_USER=${AUTH_USER:-}
+      - AUTH_PASS=${AUTH_PASS:-}
