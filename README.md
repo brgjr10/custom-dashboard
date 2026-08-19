@@ -2,7 +2,7 @@
 
 A customizable home server dashboard with modular widgets. Dark theme, config-driven, easy to extend.
 
-<img width="1193" height="870" alt="image" src="https://github.com/user-attachments/assets/ada3aa5a-c212-422c-a112-0e926cd62f28" />
+<img width="1191" height="927" alt="image" src="https://github.com/user-attachments/assets/957697be-affc-4882-bf2c-0afd0ccc6752" />
 
 ## Setup
 
