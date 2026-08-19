@@ -12,3 +12,4 @@ npm-debug.log
 .env.production
 *.pid
 *.seed
+docker-compose.yml

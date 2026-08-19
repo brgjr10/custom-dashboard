@@ -1,6 +1,8 @@
 const DEFAULT_CONFIG = {
   title: 'Home Dashboard',
   refreshInterval: 30000,
+  theme: 'dark',
+  unit: 'C',
   widgets: [
     {
       id: 'system-stats',
@@ -91,6 +93,20 @@ const DEFAULT_CONFIG = {
       enabled: true,
       order: 5,
       refreshInterval: 30000
+    },
+    {
+      id: 'weather',
+      type: 'weather',
+      title: 'Weather',
+      gridCol: 1,
+      gridColSpan: 6,
+      gridRow: 7,
+      gridRowSpan: 2,
+      enabled: true,
+      order: 6,
+      refreshInterval: 30000,
+      city: 'Bend',
+      state: 'Oregon'
     }
   ]
 };
@@ -132,6 +148,12 @@ const WIDGET_TYPES = {
     description: 'Download speed test',
     defaultSize: 'small'
   },
+  weather: {
+    name: 'Weather',
+    icon: '🌤️',
+    description: 'Local weather from Open-Meteo',
+    defaultSize: 'small'
+  },
   custom: {
     name: 'Custom HTML',
     icon: '🧩',
@@ -154,6 +176,12 @@ function loadConfig() {
   } catch (e) {
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   }
+  if (!config.theme) {
+    config.theme = 'dark';
+  }
+  if (!config.unit) {
+    config.unit = 'C';
+  }
   saveConfig();
 }
 
@@ -163,6 +191,14 @@ async function loadConfigAsync() {
     if (saved) {
       config = JSON.parse(saved);
       migrateLayoutToGrid();
+      if (!config.theme) {
+        config.theme = 'dark';
+        saveConfig();
+      }
+      if (!config.unit) {
+        config.unit = 'C';
+        saveConfig();
+      }
       return;
     }
   } catch (e) {
@@ -174,6 +210,12 @@ async function loadConfigAsync() {
       const fileConfig = await response.json();
       config = JSON.parse(JSON.stringify(fileConfig));
       migrateLayoutToGrid();
+      if (!config.theme) {
+        config.theme = 'dark';
+      }
+      if (!config.unit) {
+        config.unit = 'C';
+      }
       saveConfig();
       return;
     }
@@ -247,6 +289,42 @@ function saveConfig() {
   } catch (e) {
     console.warn('Could not save config to localStorage');
   }
+}
+
+function getTheme() {
+  return config?.theme || 'dark';
+}
+
+function setTheme(theme) {
+  if (!config) return;
+  config.theme = theme;
+  saveConfig();
+  applyTheme(theme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('dashboard-theme', theme);
+  const select = document.getElementById('theme-select');
+  if (select) select.value = theme;
+}
+
+function getUnit() {
+  return config?.unit || 'C';
+}
+
+function setUnit(unit) {
+  if (!config) return;
+  config.unit = unit === 'F' ? 'F' : 'C';
+  saveConfig();
+  applyUnit(unit);
+}
+
+function applyUnit(unit) {
+  document.documentElement.setAttribute('data-unit', unit);
+  localStorage.setItem('dashboard-unit', unit);
+  const btn = document.getElementById('unit-toggle');
+  if (btn) btn.textContent = unit === 'F' ? '°F' : '°C';
 }
 
 function getWidgets() {

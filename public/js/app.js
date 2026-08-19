@@ -314,6 +314,22 @@ function setupEventListeners() {
     });
   }
 
+  const themeSelect = document.getElementById('theme-select');
+  if (themeSelect) {
+    themeSelect.addEventListener('change', (e) => {
+      setTheme(e.target.value);
+    });
+  }
+
+  const unitToggle = document.getElementById('unit-toggle');
+  if (unitToggle) {
+    unitToggle.addEventListener('click', () => {
+      const newUnit = getUnit() === 'C' ? 'F' : 'C';
+      setUnit(newUnit);
+      activeWidgets.forEach(({ widget }) => widget.load());
+    });
+  }
+
   if (saveLayoutBtn) {
     saveLayoutBtn.addEventListener('click', () => {
       editMode = false;
@@ -432,6 +448,13 @@ function configureWidget(widgetId) {
       updateWidget(widgetId, { refreshInterval: parseInt(interval) || 0 });
       renderDashboard();
     }
+  } else if (widgetConfig.type === 'weather') {
+    const city = prompt('City:', widgetConfig.city || 'Bend');
+    const state = prompt('State:', widgetConfig.state || 'Oregon');
+    if (city !== null && state !== null) {
+      updateWidget(widgetId, { city: city.trim(), state: state.trim() });
+      renderDashboard();
+    }
   }
 }
 
@@ -453,7 +476,8 @@ function exportLayout() {
       ...(w.type === 'links' && { links: w.links }),
       ...(w.type === 'github' && { user: w.user, repo: w.repo }),
       ...(w.type === 'custom' && { url: w.url }),
-      ...(w.type === 'speedtest' && { refreshInterval: w.refreshInterval })
+      ...(w.type === 'speedtest' && { refreshInterval: w.refreshInterval }),
+      ...(w.type === 'weather' && { city: w.city, state: w.state })
     }))
   };
 
@@ -495,7 +519,8 @@ function importLayout(event) {
         ...(w.type === 'links' && { links: w.links || [] }),
         ...(w.type === 'github' && { user: w.user, repo: w.repo }),
         ...(w.type === 'custom' && { url: w.url }),
-        ...(w.type === 'speedtest' && { refreshInterval: w.refreshInterval || 30000 })
+        ...(w.type === 'speedtest' && { refreshInterval: w.refreshInterval || 30000 }),
+        ...(w.type === 'weather' && { city: w.city || 'Bend', state: w.state || 'Oregon' })
       }));
 
       saveConfig();
@@ -678,5 +703,7 @@ document.addEventListener('click', (e) => {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadConfigAsync();
+  applyTheme(getTheme());
+  applyUnit(getUnit());
   init();
 });

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-08-19T13:49:37.387Z",
+  "exportedAt": "2026-08-19T14:53:28.387Z",
   "widgets": [
     {
       "id": "system-stats",
@@ -147,10 +147,23 @@
       "gridCol": 4,
       "gridRow": 1,
       "gridColSpan": 3,
-      "gridRowSpan": 4,
+      "gridRowSpan": 3,
       "enabled": true,
       "order": 5,
       "refreshInterval": 30000
+    },
+    {
+      "id": "weather-1787149042548",
+      "type": "weather",
+      "title": "Weather",
+      "gridCol": 4,
+      "gridRow": 4,
+      "gridColSpan": 3,
+      "gridRowSpan": 1,
+      "enabled": true,
+      "order": 6,
+      "city": "Akron",
+      "state": "Ohio"
     }
   ]
 }

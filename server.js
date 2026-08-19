@@ -688,6 +688,107 @@ function makeHttpRequest(hostname, port, path) {
   });
 }
 
+app.get('/api/network', (req, res) => {
+  try {
+    const interfaces = os.networkInterfaces();
+    const formatted = Object.entries(interfaces).map(([name, addrs]) => ({
+      name,
+      addresses: addrs.filter(addr => addr.family === 'IPv4').map(addr => ({
+        address: addr.address,
+        netmask: addr.netmask,
+        mac: addr.mac,
+        internal: addr.internal
+      }))
+    }));
+    res.json({ interfaces: formatted, updated: Date.now() });
+  } catch (e) {
+    res.json({ error: 'Failed to fetch network info' });
+  }
+});
+
+app.get('/api/geocode', async (req, res) => {
+  const city = (req.query.city || '').trim();
+  const state = (req.query.state || '').trim();
+  if (!city) {
+    return res.json({ error: 'Missing city parameter' });
+  }
+  try {
+    const query = state ? `${city}, ${state}` : city;
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Geocoding API error');
+    const data = await response.json();
+    const result = data.results?.[0];
+    if (!result) {
+      return res.json({ error: 'Location not found' });
+    }
+    res.json({
+      latitude: result.latitude,
+      longitude: result.longitude,
+      name: result.name,
+      country: result.country
+    });
+  } catch (e) {
+    res.json({ error: 'Failed to geocode location' });
+  }
+});
+
+app.get('/api/weather', async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  const city = (req.query.city || '').trim();
+  const state = (req.query.state || '').trim();
+
+  try {
+    let resolvedLat = lat;
+    let resolvedLon = lon;
+
+    if ((!isNaN(resolvedLat) && !isNaN(resolvedLon)) || (!city)) {
+      if (isNaN(resolvedLat) || isNaN(resolvedLon)) {
+        resolvedLat = 44.06;
+        resolvedLon = -121.31;
+      }
+    } else if (city) {
+      const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city + (state ? ', ' + state : ''))}&count=1&language=en&format=json`;
+      const geoRes = await fetch(geoUrl);
+      if (!geoRes.ok) throw new Error('Geocoding API error');
+      const geoData = await geoRes.json();
+      const result = geoData.results?.[0];
+      if (!result) {
+        return res.json({ error: 'Location not found' });
+      }
+      resolvedLat = result.latitude;
+      resolvedLon = result.longitude;
+    }
+
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${resolvedLat}&longitude=${resolvedLon}&current_weather=true`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Weather API error');
+    const data = await response.json();
+    res.json({
+      temperature: data.current_weather?.temperature || 0,
+      windspeed: data.current_weather?.windspeed || 0,
+      weathercode: data.current_weather?.weathercode || 0,
+      updated: Date.now()
+    });
+  } catch (e) {
+    res.json({ error: 'Failed to fetch weather data' });
+  }
+});
+
+app.get('/api/docker/:id/stats', async (req, res) => {
+  const containerId = req.params.id;
+  try {
+    const data = await dockerSocketRequest(`/containers/${containerId}/stats?stream=0`);
+    if (!data) {
+      return res.json({ error: 'No stats available' });
+    }
+    res.json(data);
+  } catch (e) {
+    res.json({ error: 'Failed to fetch container stats' });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Dashboard running at http://localhost:${PORT}`);
 });

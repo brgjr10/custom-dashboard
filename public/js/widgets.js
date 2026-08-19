@@ -68,6 +68,14 @@ function parseDiskSize(value) {
   return num * multiplier / 1073741824;
 }
 
+function convertTemp(celsius) {
+  const unit = (typeof getUnit === 'function' ? getUnit() : 'C');
+  if (unit === 'F') {
+    return Math.round(celsius * 9 / 5 + 32);
+  }
+  return Math.round(celsius);
+}
+
 class LinksWidget extends Widget {
   async fetchData() {
     return { links: this.config.links || [], updated: Date.now() };
@@ -98,11 +106,13 @@ class SystemWidget extends Widget {
 
   format(data) {
     let html = '';
+    const unit = getUnit();
     
     if (data.temp) {
+      const displayTemp = convertTemp(data.temp);
       const tempClass = data.temp < 60 ? 'normal' : data.temp < 75 ? 'warm' : 'hot';
       html += `
-        <div class="temp-display ${tempClass}">${data.temp}°C</div>
+        <div class="temp-display ${tempClass}">${displayTemp}°${unit}</div>
       `;
     }
 
@@ -199,6 +209,25 @@ class DockerWidget extends Widget {
     const response = await fetch('/api/docker');
     if (!response.ok) throw new Error('Failed to fetch Docker status');
     const data = await response.json();
+    
+    if (data.containers && data.containers.length > 0) {
+      const statsPromises = data.containers
+        .filter(c => (c.State || {}).Status === 'running' || c.State === 'running')
+        .map(c => fetch(`/api/docker/${c.Id}/stats`).then(r => r.json()).catch(() => null));
+      const statsResults = await Promise.all(statsPromises);
+      const statsMap = {};
+      let statsIndex = 0;
+      data.containers.forEach(c => {
+        const state = c.State || {};
+        const isRunning = state.Status === 'running' || state === 'running';
+        if (isRunning && statsResults[statsIndex]) {
+          statsMap[c.Id] = statsResults[statsIndex];
+          statsIndex++;
+        }
+      });
+      data.stats = statsMap;
+    }
+    
     data.updated = Date.now();
     return data;
   }
@@ -217,6 +246,47 @@ class DockerWidget extends Widget {
                          statusText === 'paused' ? 'paused' : 'stopped';
       const name = container.Names?.[0]?.replace(/^\//, '') || container.Id?.slice(0, 12) || 'unnamed';
       const containerId = container.Id || container.Id?.slice(0, 12) || '';
+      const stats = data.stats?.[containerId];
+      
+      let resourceHtml = '';
+      if (stats && !stats.error) {
+        const memUsage = stats.memory_stats?.usage || 0;
+        const memLimit = stats.memory_stats?.limit || 0;
+        const memPercent = memLimit > 0 ? Math.round((memUsage / memLimit) * 100) : 0;
+        const memMb = (memUsage / 1024 / 1024).toFixed(0);
+        const memLimitMb = (memLimit / 1024 / 1024).toFixed(0);
+        
+        let cpuPercent = 0;
+        if (stats.cpu_stats) {
+          const cpuDelta = stats.cpu_stats.cpu_usage?.total_usage || 0;
+          const systemDelta = stats.cpu_stats.system_cpu_usage || 0;
+          const cpuCount = stats.cpu_stats.online_cpus || 1;
+          if (systemDelta > 0) {
+            cpuPercent = Math.round((cpuDelta / systemDelta) * cpuCount * 100);
+          }
+        }
+        
+        const netRx = stats.networks ? Object.values(stats.networks).reduce((sum, n) => sum + (n.rx_bytes || 0), 0) : 0;
+        const netTx = stats.networks ? Object.values(stats.networks).reduce((sum, n) => sum + (n.tx_bytes || 0), 0) : 0;
+        
+        resourceHtml = `
+          <div class="container-resources">
+            <div class="resource-item">
+              <span class="resource-label">CPU</span>
+              <span class="resource-value">${cpuPercent}%</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">MEM</span>
+              <span class="resource-value">${memMb}/${memLimitMb} MB</span>
+            </div>
+            <div class="resource-item">
+              <span class="resource-label">NET</span>
+              <span class="resource-value">${formatBytes(netRx)}↓ ${formatBytes(netTx)}↑</span>
+            </div>
+          </div>
+        `;
+      }
+      
       return `
         <div class="docker-container">
           <div class="container-status">
@@ -224,6 +294,7 @@ class DockerWidget extends Widget {
             <span>${name}</span>
           </div>
           <span style="font-size: 0.75rem; color: var(--text-muted);">${statusText}</span>
+          ${resourceHtml}
           <div class="docker-actions">
             <button class="docker-action" data-action="start" data-id="${containerId}" title="Start">▶</button>
             <button class="docker-action" data-action="stop" data-id="${containerId}" title="Stop">■</button>
@@ -234,6 +305,14 @@ class DockerWidget extends Widget {
     }).join('');
     return `<div class="docker-list">${containersHtml}</div>`;
   }
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0B';
+  const k = 1024;
+  const sizes = ['B', 'K', 'M', 'G'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
 }
 
 class GitHubWidget extends Widget {
@@ -455,6 +534,71 @@ class CustomWidget extends Widget {
   }
 }
 
+class NetworkWidget extends Widget {
+  async fetchData() {
+    const response = await fetch('/api/network');
+    if (!response.ok) throw new Error('Failed to fetch network info');
+    const data = await response.json();
+    data.updated = Date.now();
+    return data;
+  }
+
+  format(data) {
+    if (data.error) {
+      return `<div class="empty-state">${data.error}</div>`;
+    }
+    const interfaces = data.interfaces || [];
+    const html = interfaces.map(iface => {
+      const ips = iface.addresses.map(a => a.address).join(', ');
+      if (!ips) return '';
+      return `
+        <div class="network-interface">
+          <div class="network-name">${iface.name}</div>
+          <div class="network-ips">${ips}</div>
+        </div>
+      `;
+    }).join('');
+    return `<div class="network-list">${html || '<div class="empty-state">No IPv4 interfaces found</div>'}</div>`;
+  }
+}
+
+class WeatherWidget extends Widget {
+  async fetchData() {
+    const city = this.config.city || '';
+    const state = this.config.state || '';
+    const response = await fetch(`/api/weather?city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}`);
+    if (!response.ok) throw new Error('Failed to fetch weather');
+    const data = await response.json();
+    data.updated = Date.now();
+    return data;
+  }
+
+  format(data) {
+    if (data.error) {
+      return `<div class="empty-state">${data.error}</div>`;
+    }
+    const weatherIcons = {
+      0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
+      45: '🌫️', 48: '🌫️',
+      51: '🌦️', 53: '🌦️', 55: '🌧️',
+      61: '🌧️', 63: '🌧️', 65: '🌧️',
+      71: '❄️', 73: '❄️', 75: '❄️',
+      80: '🌦️', 81: '🌧️', 82: '⛈️',
+      95: '⛈️', 96: '⛈️', 99: '⛈️'
+    };
+    const icon = weatherIcons[data.weathercode] || '🌡️';
+    const temp = convertTemp(data.temperature);
+    const unit = getUnit();
+    return `
+      <div class="weather-display">
+        <div class="weather-icon">${icon}</div>
+        <div class="weather-temp">${temp}°${unit}</div>
+        <div class="weather-wind">${data.windspeed} km/h</div>
+      </div>
+    `;
+  }
+}
+
 const WIDGET_CLASSES = {
   links: LinksWidget,
   system: SystemWidget,
@@ -462,5 +606,7 @@ const WIDGET_CLASSES = {
   docker: DockerWidget,
   github: GitHubWidget,
   speedtest: SpeedtestWidget,
+  network: NetworkWidget,
+  weather: WeatherWidget,
   custom: CustomWidget
 };
