@@ -733,14 +733,17 @@ function renderLinkEditorList() {
     return;
   }
   
-  list.innerHTML = currentLinks.map((link, index) => `
-    <div class="link-editor-item" data-index="${index}">
-      <button class="emoji-picker-btn" type="button" data-index="${index}">${link.icon || '🔗'}</button>
-      <input type="text" class="link-label-input" value="${link.label || ''}" placeholder="Label" data-field="label">
-      <input type="text" class="link-url-input" value="${link.url || ''}" placeholder="https://..." data-field="url">
-      <button class="link-delete-btn" data-action="delete" title="Delete">×</button>
-    </div>
-  `).join('');
+  list.innerHTML = currentLinks.map((link, index) => {
+    const icon = link.icon ? (link.icon.startsWith('fa-') ? `<i class="${link.icon}"></i>` : link.icon) : '🔗';
+    return `
+      <div class="link-editor-item" data-index="${index}">
+        <button class="emoji-picker-btn" type="button" data-index="${index}">${icon}</button>
+        <input type="text" class="link-label-input" value="${link.label || ''}" placeholder="Label" data-field="label">
+        <input type="text" class="link-url-input" value="${link.url || ''}" placeholder="https://..." data-field="url">
+        <button class="link-delete-btn" data-action="delete" title="Delete">×</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function saveLinks() {
@@ -769,7 +772,7 @@ document.getElementById('link-editor-modal')?.addEventListener('click', (e) => {
 document.getElementById('close-link-editor')?.addEventListener('click', closeLinkEditor);
 
 document.getElementById('add-link-btn')?.addEventListener('click', () => {
-  currentLinks.push({ icon: '🔗', label: '', url: '' });
+  currentLinks.push({ icon: 'fa-solid fa-link', label: '', url: '' });
   renderLinkEditorList();
 });
 
@@ -819,6 +822,17 @@ document.getElementById('emoji-picker')?.addEventListener('click', (e) => {
     currentLinks[currentEmojiField].icon = emoji;
     renderLinkEditorList();
     hideEmojiPicker();
+  }
+});
+
+document.getElementById('fa-icon-picker')?.addEventListener('click', (e) => {
+  const faOption = e.target.closest('.fa-icon-option');
+  if (!faOption) return;
+  
+  const icon = faOption.dataset.icon || '';
+  if (icon && currentEmojiField !== null && currentLinks[currentEmojiField]) {
+    currentLinks[currentEmojiField].icon = icon;
+    renderLinkEditorList();
   }
 });
 
