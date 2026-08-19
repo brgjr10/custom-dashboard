@@ -1,0 +1,156 @@
+{
+  "version": 1,
+  "exportedAt": "2026-08-19T13:49:37.387Z",
+  "widgets": [
+    {
+      "id": "system-stats",
+      "type": "system",
+      "title": "System Stats",
+      "gridCol": 1,
+      "gridRow": 1,
+      "gridColSpan": 3,
+      "gridRowSpan": 4,
+      "enabled": true,
+      "order": 0,
+      "refreshInterval": 30000
+    },
+    {
+      "id": "storage",
+      "type": "storage",
+      "title": "Storage",
+      "gridCol": 7,
+      "gridRow": 6,
+      "gridColSpan": 3,
+      "gridRowSpan": 1,
+      "enabled": true,
+      "order": 1,
+      "refreshInterval": 30000
+    },
+    {
+      "id": "docker-health",
+      "type": "docker",
+      "title": "Docker Containers",
+      "gridCol": 10,
+      "gridRow": 1,
+      "gridColSpan": 3,
+      "gridRowSpan": 6,
+      "enabled": true,
+      "order": 2,
+      "refreshInterval": 30000
+    },
+    {
+      "id": "quick-links",
+      "type": "links",
+      "title": "Quick Links",
+      "gridCol": 7,
+      "gridRow": 1,
+      "gridColSpan": 3,
+      "gridRowSpan": 5,
+      "enabled": true,
+      "order": 3,
+      "refreshInterval": 30000,
+      "links": [
+        {
+          "icon": "🚀",
+          "label": "Uptime Kuma",
+          "url": "http://192.168.4.90:3001/status/connection"
+        },
+        {
+          "icon": "🐳",
+          "label": "Portainer",
+          "url": "http://192.168.4.110:9000"
+        },
+        {
+          "icon": "📊",
+          "label": "Pi-hole",
+          "url": "http://192.168.4.90/admin/login"
+        },
+        {
+          "icon": "📦",
+          "label": "ZimaOS",
+          "url": "http://192.168.4.110/#/"
+        },
+        {
+          "icon": "🐙",
+          "label": "OctoPi",
+          "url": "http://192.168.4.34/"
+        },
+        {
+          "icon": "🖥️",
+          "label": "Cooler Control",
+          "url": "http://192.168.4.110:11987/"
+        },
+        {
+          "icon": "🏠",
+          "label": "Home Assistant",
+          "url": "http://192.168.4.110:8123/dashboard-main"
+        },
+        {
+          "icon": "📱",
+          "label": "Container Flow",
+          "url": "http://192.168.4.110:9470/"
+        },
+        {
+          "icon": "📹",
+          "label": "PatrolTube",
+          "url": "http://192.168.4.110:8001/"
+        },
+        {
+          "icon": "📷",
+          "label": "ODOT Cameras",
+          "url": "http://192.168.4.110:5173/"
+        },
+        {
+          "icon": "📌",
+          "label": "Police Radio",
+          "url": "http://192.168.4.110:5050/"
+        },
+        {
+          "icon": "📝",
+          "label": "Second Brain",
+          "url": "http://192.168.4.110:8088/"
+        },
+        {
+          "icon": "🌐",
+          "label": "Terminal",
+          "url": "http://192.168.4.110:7681/"
+        },
+        {
+          "icon": "⌨️",
+          "label": "VSCode",
+          "url": "https://vscode.dev/"
+        },
+        {
+          "icon": "📁",
+          "label": "GitHub",
+          "url": "https://github.com/brgjr10"
+        }
+      ]
+    },
+    {
+      "id": "github-activity",
+      "type": "github",
+      "title": "GitHub Activity",
+      "gridCol": 1,
+      "gridRow": 5,
+      "gridColSpan": 6,
+      "gridRowSpan": 2,
+      "enabled": true,
+      "order": 4,
+      "refreshInterval": 30000,
+      "user": "brgjr10"
+    },
+    {
+      "id": "speedtest",
+      "type": "speedtest",
+      "title": "Internet Speed",
+      "gridCol": 4,
+      "gridRow": 1,
+      "gridColSpan": 3,
+      "gridRowSpan": 4,
+      "enabled": true,
+      "order": 5,
+      "refreshInterval": 30000
+    }
+  ]
+}

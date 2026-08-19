@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    container_name: custom-dashboard
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /:/hostfs:ro
+    environment:
+      - NODE_ENV=production
+      - GITHUB_TOKEN=your_github_token_here

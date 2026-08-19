@@ -1,0 +1,13 @@
+{
+  "name": "custom-dashboard",
+  "version": "1.0.0",
+  "description": "Home server dashboard with modular widgets",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
