@@ -46,39 +46,42 @@ function renderDashboard() {
   const colCount = 12;
   const colWidth = (gridRect.width - gutter * (colCount - 1)) / colCount;
 
-  widgetConfigs.forEach((config, index) => {
-    const WidgetClass = WIDGET_CLASSES[config.type];
+  const dashboardRefreshInterval = config.refreshInterval;
+
+  widgetConfigs.forEach((widgetConfig, index) => {
+    const WidgetClass = WIDGET_CLASSES[widgetConfig.type];
     if (!WidgetClass) return;
 
-    const widget = new WidgetClass(null, config);
+    const widget = new WidgetClass(null, widgetConfig);
     const element = widget.render();
     grid.appendChild(element);
-    activeWidgets.push({ config, widget, element });
+    activeWidgets.push({ config: widgetConfig, widget, element });
 
     let col = 1;
     let colSpan = 3;
 
-    if (config.gridCol !== undefined) col = config.gridCol;
-    else if (config.x !== undefined) col = Math.max(1, Math.round((parseInt(config.x) || 0) / (colWidth + gutter)) + 1);
+    if (widgetConfig.gridCol !== undefined) col = widgetConfig.gridCol;
+    else if (widgetConfig.x !== undefined) col = Math.max(1, Math.round((parseInt(widgetConfig.x) || 0) / (colWidth + gutter)) + 1);
 
-    if (config.gridColSpan !== undefined) colSpan = config.gridColSpan;
-    else if (config.width) colSpan = Math.max(1, Math.round((parseInt(config.width) || colWidth) / (colWidth + gutter)));
+    if (widgetConfig.gridColSpan !== undefined) colSpan = widgetConfig.gridColSpan;
+    else if (widgetConfig.width) colSpan = Math.max(1, Math.round((parseInt(widgetConfig.width) || colWidth) / (colWidth + gutter)));
 
     element.style.gridColumn = `${col} / span ${colSpan}`;
-    if (config.gridRow !== undefined) {
-      element.style.gridRow = `${config.gridRow} / span ${config.gridRowSpan || 1}`;
+    if (widgetConfig.gridRow !== undefined) {
+      element.style.gridRow = `${widgetConfig.gridRow} / span ${widgetConfig.gridRowSpan || 1}`;
     }
 
     widget.load();
 
-    if (refreshTimers[config.id]) {
-      clearInterval(refreshTimers[config.id]);
+    if (refreshTimers[widgetConfig.id]) {
+      clearInterval(refreshTimers[widgetConfig.id]);
     }
 
-    if (config.refreshInterval && config.refreshInterval > 0) {
-      refreshTimers[config.id] = setInterval(() => {
+    const refreshMs = widgetConfig.refreshInterval ?? dashboardRefreshInterval;
+    if (refreshMs && refreshMs > 0) {
+      refreshTimers[widgetConfig.id] = setInterval(() => {
         widget.load();
-      }, config.refreshInterval);
+      }, refreshMs);
     }
   });
 
@@ -290,6 +293,8 @@ function setupEventListeners() {
   const saveLayoutBtn = document.getElementById('save-layout');
   const panel = document.getElementById('add-widget-panel');
   const editBanner = document.getElementById('edit-banner');
+  const settingsToggle = document.getElementById('settings-toggle');
+  const settingsPanel = document.getElementById('settings-panel');
 
   if (addBtn) {
     addBtn.addEventListener('click', () => {
@@ -314,6 +319,23 @@ function setupEventListeners() {
     });
   }
 
+  if (settingsToggle && settingsPanel) {
+    settingsToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const refreshRateSelect = document.getElementById('refresh-rate-select');
+      if (refreshRateSelect && config.refreshInterval) {
+        refreshRateSelect.value = String(config.refreshInterval);
+      }
+      settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'flex' : 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!settingsPanel.contains(e.target) && e.target !== settingsToggle) {
+        settingsPanel.style.display = 'none';
+      }
+    });
+  }
+
   const themeSelect = document.getElementById('theme-select');
   if (themeSelect) {
     themeSelect.addEventListener('change', (e) => {
@@ -327,6 +349,18 @@ function setupEventListeners() {
       const newUnit = getUnit() === 'C' ? 'F' : 'C';
       setUnit(newUnit);
       activeWidgets.forEach(({ widget }) => widget.load());
+    });
+  }
+
+  const refreshRateSelect = document.getElementById('refresh-rate-select');
+  if (refreshRateSelect) {
+    refreshRateSelect.addEventListener('change', (e) => {
+      const ms = parseInt(e.target.value, 10);
+      if (!isNaN(ms)) {
+        config.refreshInterval = ms;
+        saveConfig();
+        renderDashboard();
+      }
     });
   }
 

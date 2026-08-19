@@ -216,6 +216,9 @@ async function loadConfigAsync() {
       if (!config.unit) {
         config.unit = 'C';
       }
+      if (!config.refreshInterval) {
+        config.refreshInterval = 30000;
+      }
       saveConfig();
       return;
     }
