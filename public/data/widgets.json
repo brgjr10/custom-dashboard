@@ -51,77 +51,77 @@
       "refreshInterval": 30000,
       "links": [
         {
-          "icon": "🚀",
+          "icon": "fa-solid fa-rocket",
           "label": "Uptime Kuma",
           "url": "http://192.168.4.90:3001/status/connection"
         },
         {
-          "icon": "🐳",
+          "icon": "fa-brands fa-docker",
           "label": "Portainer",
           "url": "http://192.168.4.110:9000"
         },
         {
-          "icon": "📊",
+          "icon": "fa-solid fa-ban",
           "label": "Pi-hole",
           "url": "http://192.168.4.90/admin/login"
         },
         {
-          "icon": "📦",
+          "icon": "fa-solid fa-server",
           "label": "ZimaOS",
           "url": "http://192.168.4.110/#/"
         },
         {
-          "icon": "🐙",
+          "icon": "fa-solid fa-camera",
           "label": "OctoPi",
           "url": "http://192.168.4.34/"
         },
         {
-          "icon": "🖥️",
+          "icon": "fa-solid fa-temperature-low",
           "label": "Cooler Control",
           "url": "http://192.168.4.110:11987/"
         },
         {
-          "icon": "🏠",
+          "icon": "fa-solid fa-house",
           "label": "Home Assistant",
           "url": "http://192.168.4.110:8123/dashboard-main"
         },
         {
-          "icon": "📱",
+          "icon": "fa-solid fa-diagram-project",
           "label": "Container Flow",
           "url": "http://192.168.4.110:9470/"
         },
         {
-          "icon": "📹",
+          "icon": "fa-solid fa-video",
           "label": "PatrolTube",
           "url": "http://192.168.4.110:8001/"
         },
         {
-          "icon": "📷",
+          "icon": "fa-solid fa-camera",
           "label": "ODOT Cameras",
           "url": "http://192.168.4.110:5173/"
         },
         {
-          "icon": "📌",
+          "icon": "fa-solid fa-radio",
           "label": "Police Radio",
           "url": "http://192.168.4.110:5050/"
         },
         {
-          "icon": "📝",
+          "icon": "fa-solid fa-brain",
           "label": "Second Brain",
           "url": "http://192.168.4.110:8088/"
         },
         {
-          "icon": "🌐",
+          "icon": "fa-solid fa-terminal",
           "label": "Terminal",
           "url": "http://192.168.4.110:7681/"
         },
         {
-          "icon": "⌨️",
+          "icon": "fa-brands fa-microsoft",
           "label": "VSCode",
           "url": "https://vscode.dev/"
         },
         {
-          "icon": "📁",
+          "icon": "fa-brands fa-github",
           "label": "GitHub",
           "url": "https://github.com/brgjr10"
         }
