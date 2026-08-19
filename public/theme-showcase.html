@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Theme Showcase</title>
+  <link rel="stylesheet" href="css/dashboard.css?v=2">
+  <style>
+    body {
+      padding: 32px;
+    }
+    .showcase-title {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+    }
+    .showcase-item {
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg-card);
+    }
+    .showcase-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-weight: 600;
+      text-align: center;
+    }
+    .showcase-preview {
+      padding: 16px;
+      min-height: 220px;
+    }
+    .mock-widget {
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .mock-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .mock-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .mock-bar {
+      height: 6px;
+      background: var(--bg-card);
+      border-radius: 3px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+    .mock-bar-fill {
+      height: 100%;
+      background: var(--accent-blue);
+      border-radius: 3px;
+    }
+    @media (max-width: 1200px) {
+      .showcase-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .showcase-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="showcase-title">Dashboard Themes</h1>
+  <div class="showcase-grid" id="showcase-grid"></div>
+
+  <script>
+    const themes = [
+      { id: 'dark', name: 'Dark' },
+      { id: 'light', name: 'Light' },
+      { id: 'ocean', name: 'Ocean' },
+      { id: 'forest', name: 'Forest' },
+      { id: 'sunset', name: 'Sunset' },
+      { id: 'purple', name: 'Purple' },
+      { id: 'high-contrast', name: 'High Contrast' },
+      { id: 'midnight', name: 'Midnight' },
+      { id: 'rose', name: 'Rose' },
+      { id: 'slate', name: 'Slate' },
+      { id: 'amber', name: 'Amber' },
+      { id: 'neon', name: 'Neon' }
+    ];
+
+    const grid = document.getElementById('showcase-grid');
+    grid.innerHTML = themes.map(theme => `
+      <div class="showcase-item" data-theme="${theme.id}">
+        <div class="showcase-header">${theme.name}</div>
+        <div class="showcase-preview">
+          <div class="mock-widget">
+            <div class="mock-title">System Stats</div>
+            <div class="mock-row"><span>CPU</span><span>23%</span></div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:23%"></div></div>
+            <div class="mock-row" style="margin-top:8px"><span>Memory</span><span>4.2 / 16 GB</span></div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:26%"></div></div>
+          </div>
+          <div class="mock-widget">
+            <div class="mock-title">Weather</div>
+            <div class="mock-row" style="justify-content:center;gap:8px">
+              <span>🌤️</span><span>72°F</span>
+            </div>
+          </div>
+          <div class="mock-widget">
+            <div class="mock-title">Quick Links</div>
+            <div class="mock-row"><span>🐳 Portainer</span></div>
+            <div class="mock-row"><span>📊 Pi-hole</span></div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  </script>
+</body>
+</html>
