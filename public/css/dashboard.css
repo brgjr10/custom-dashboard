@@ -596,10 +596,32 @@ body {
   margin-bottom: 6px;
 }
 
+.link-icon i {
+  font-size: 1.5rem;
+}
+
 .link-label {
   font-size: 0.75rem;
   color: var(--text-secondary);
   word-break: break-word;
+}
+
+.system-icon {
+  text-align: center;
+  font-size: 1.75rem;
+  color: var(--accent-blue);
+  margin-bottom: 8px;
+}
+
+.speed-icon {
+  text-align: center;
+  font-size: 2rem;
+  color: var(--accent-green);
+  margin-bottom: 8px;
+}
+
+.docker-action i {
+  font-size: 0.75rem;
 }
 
 /* System Stats Widget */
@@ -1176,6 +1198,14 @@ body {
 
   .speed-number {
     font-size: 2rem;
+  }
+
+  .system-icon {
+    font-size: 1.5rem;
+  }
+
+  .speed-icon {
+    font-size: 1.75rem;
   }
 
   .add-widget-panel {

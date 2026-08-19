@@ -87,12 +87,15 @@ class LinksWidget extends Widget {
     if (!data.links || data.links.length === 0) {
       return '<div class="empty-state">No links configured</div>';
     }
-    const linksHtml = data.links.map(link => `
-      <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="link-item">
-        <span class="link-icon">${link.icon || '🔗'}</span>
-        <span class="link-label">${link.label}</span>
-      </a>
-    `).join('');
+    const linksHtml = data.links.map(link => {
+      const icon = link.icon ? (link.icon.startsWith('fa-') ? `<i class="${link.icon}"></i>` : link.icon) : '<i class="fa-solid fa-link"></i>';
+      return `
+        <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="link-item">
+          <span class="link-icon">${icon}</span>
+          <span class="link-label">${link.label}</span>
+        </a>
+      `;
+    }).join('');
     return `<div class="links-grid">${linksHtml}</div>`;
   }
 }
@@ -107,7 +110,7 @@ class SystemWidget extends Widget {
   }
 
   format(data) {
-    let html = '';
+    let html = '<div class="system-icon"><i class="fa-solid fa-server"></i></div>';
     const unit = getUnit();
     
     if (data.temp) {
@@ -192,7 +195,7 @@ class StorageWidget extends Widget {
     return `
       <div class="disk-item">
         <div class="disk-header">
-          <span class="disk-name">Total Storage</span>
+          <span class="disk-name"><i class="fa-solid fa-hard-drive"></i> Total Storage</span>
           <span class="disk-percent">${percent}%</span>
         </div>
         <div class="stat-bar">
@@ -298,9 +301,9 @@ class DockerWidget extends Widget {
           <span style="font-size: 0.75rem; color: var(--text-muted);">${statusText}</span>
           ${resourceHtml}
           <div class="docker-actions">
-            <button class="docker-action" data-action="start" data-id="${containerId}" title="Start">▶</button>
-            <button class="docker-action" data-action="stop" data-id="${containerId}" title="Stop">■</button>
-            <button class="docker-action" data-action="restart" data-id="${containerId}" title="Restart">⟳</button>
+            <button class="docker-action" data-action="start" data-id="${containerId}" title="Start"><i class="fa-solid fa-play"></i></button>
+            <button class="docker-action" data-action="stop" data-id="${containerId}" title="Stop"><i class="fa-solid fa-stop"></i></button>
+            <button class="docker-action" data-action="restart" data-id="${containerId}" title="Restart"><i class="fa-solid fa-rotate"></i></button>
           </div>
         </div>
       `;
@@ -412,7 +415,7 @@ class GitHubWidget extends Widget {
     html += '<div class="github-info">';
     
     if (profile.name) {
-      html += `<div class="github-name">${profile.name}</div>`;
+      html += `<div class="github-name"><i class="fa-brands fa-github"></i> ${profile.name}</div>`;
     }
     
     if (profile.bio) {
@@ -510,6 +513,7 @@ class SpeedtestWidget extends Widget {
     }
     return `
       <div class="speed-value">
+        <div class="speed-icon"><i class="fa-solid fa-gauge-high"></i></div>
         <div class="speed-number">${data.download}</div>
         <div class="speed-unit">Mbps</div>
       </div>
@@ -555,7 +559,7 @@ class NetworkWidget extends Widget {
       if (!ips) return '';
       return `
         <div class="network-interface">
-          <div class="network-name">${iface.name}</div>
+          <div class="network-name"><i class="fa-solid fa-network-wired"></i> ${iface.name}</div>
           <div class="network-ips">${ips}</div>
         </div>
       `;
@@ -595,7 +599,7 @@ class WeatherWidget extends Widget {
       <div class="weather-display">
         <div class="weather-icon">${icon}</div>
         <div class="weather-temp">${temp}°${unit}</div>
-        <div class="weather-wind">${data.windspeed} km/h</div>
+        <div class="weather-wind"><i class="fa-solid fa-wind"></i> ${data.windspeed} km/h</div>
       </div>
     `;
   }
