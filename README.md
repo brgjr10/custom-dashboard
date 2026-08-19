@@ -13,16 +13,29 @@ npm start
 
 Open http://localhost:4000
 
+## Docker
+
+```bash
+cp .env.example .env
+# Edit .env and set GITHUB_TOKEN=your_actual_token
+docker compose up -d --build
+```
+
+The container reads `GITHUB_TOKEN` from `.env`. Do not hardcode secrets in `docker-compose.yml`.
+
 ## Features
 
 - **Add/Remove Widgets** - Click "Add Widget" to add new widgets, or use Edit mode to remove them
 - **System Stats** - CPU usage, memory, temperature, uptime
 - **Storage** - Disk usage per mount point
-- **Docker Health** - Container status and state
+- **Docker Health** - Container status and resource usage (CPU, memory, network)
 - **GitHub Activity** - Track activity across your entire GitHub account or a single repo
 - **Internet Speed** - Download speed test
-- **Uptime Kuma** - Embedded status page
 - **Quick Links** - Easy shortcuts grid
+- **Weather** - Local weather by city/state (Open-Meteo)
+- **Network** - Network interfaces and IPs
+- **Themes** - Multiple color themes with persistent preference
+- **Unit Toggle** - Switch between Celsius and Fahrenheit
 
 ## Configuration
 
@@ -64,39 +77,25 @@ Click "Add Widget" → "GitHub Activity", or add to config:
 In account-wide mode, the widget shows a green contribution chart similar to GitHub's profile graph.
 
 **Avoiding rate limits:**
-GitHub's GraphQL API rate-limits unauthenticated requests. To avoid this, set a `GITHUB_TOKEN` environment variable with a personal access token:
+GitHub's GraphQL API rate-limits unauthenticated requests. To avoid this, set a `GITHUB_TOKEN` environment variable in `.env` with a personal access token:
 
 ```bash
-docker compose down
-GITHUB_TOKEN=ghp_xxxx docker compose up -d --build
+GITHUB_TOKEN=ghp_xxxx
 ```
 
-Or add it to `docker-compose.yml`:
-```yaml
-services:
-  dashboard:
-    build: .
-    container_name: custom-dashboard
-    restart: unless-stopped
-    ports:
-      - "4000:4000"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - NODE_ENV=production
-      - GITHUB_TOKEN=ghp_xxxx
-```
+### Adding a Weather Widget
 
-### Adding an Uptime Kuma Widget
-
-Click "Add Widget" → "Uptime Kuma", or add to config:
+Click "Add Widget" → "Weather", or add to config:
 
 ```json
 {
-  "type": "uptimekuma",
-  "url": "http://192.168.4.90:3001/status/connection"
+  "type": "weather",
+  "city": "Bend",
+  "state": "Oregon"
 }
 ```
+
+Click the gear icon on the widget to change city/state.
 
 ### Adding a Custom Widget
 
@@ -137,9 +136,12 @@ Add new widgets by:
 |----------|-------------|
 | `/api/system` | CPU, memory, temp, disks, uptime |
 | `/api/docker` | Container list and status |
+| `/api/docker/:id/stats` | Per-container CPU/memory/network stats |
 | `/api/speedtest` | Download speed test |
 | `/api/github/activity` | GitHub account events (no repo) or repo events (with repo) |
 | `/api/github/contributions` | GitHub contribution calendar for chart widget |
+| `/api/weather` | Current weather by city/state or lat/lon |
+| `/api/network` | Network interfaces and IPs |
 | `/api/health` | Server health check |
 
 ## Styling
