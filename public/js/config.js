@@ -52,21 +52,21 @@ export const DEFAULT_CONFIG = {
       order: 3,
       refreshInterval: 30000,
       links: [
-        { icon: '🚀', label: 'Uptime Kuma', url: 'http://192.168.4.90:3001/status/connection' },
-        { icon: '🐳', label: 'Portainer', url: 'http://localhost:9000' },
-        { icon: '📊', label: 'Pi-hole', url: 'http://192.168.4.90/admin/login' },
-        { icon: '📦', label: 'ZimaOS', url: 'http://192.168.4.110/#/' },
-        { icon: '🐙', label: 'OctoPi', url: 'http://192.168.4.34/' },
-        { icon: '🖥️', label: 'Cooler Control', url: 'http://192.168.4.110:11987/' },
-        { icon: '🏠', label: 'Home Assistant', url: 'http://192.168.4.110:8123/dashboard-main' },
-        { icon: '📱', label: 'Container Flow', url: 'http://192.168.4.110:9470/' },
-        { icon: '📹', label: 'PatrolTube', url: 'http://192.168.4.110:8001/' },
-        { icon: '📷', label: 'ODOT Cameras', url: 'http://192.168.4.110:5173/' },
-        { icon: '📌', label: 'Police Radio', url: 'http://192.168.4.110:5050/' },
-        { icon: '📝', label: 'Second Brain', url: 'http://192.168.4.110:8088/' },
-        { icon: '🌐', label: 'Terminal', url: 'http://192.168.4.110:7681/' },
-        { icon: '⌨️', label: 'VSCode', url: 'https://vscode.dev/' },
-        { icon: '📁', label: 'GitHub', url: 'https://github.com/brgjr10' }
+        { icon: 'fa-solid fa-rocket', label: 'Uptime Kuma', url: 'http://192.168.4.90:3001/status/connection' },
+        { icon: 'fa-brands fa-docker', label: 'Portainer', url: 'http://192.168.4.110:9000' },
+        { icon: 'fa-solid fa-ban', label: 'Pi-hole', url: 'http://192.168.4.90/admin/login' },
+        { icon: 'fa-solid fa-server', label: 'ZimaOS', url: 'http://192.168.4.110/#/' },
+        { icon: 'fa-solid fa-camera', label: 'OctoPi', url: 'http://192.168.4.34/' },
+        { icon: 'fa-solid fa-temperature-low', label: 'Cooler Control', url: 'http://192.168.4.110:11987/' },
+        { icon: 'fa-solid fa-house', label: 'Home Assistant', url: 'http://192.168.4.110:8123/dashboard-main' },
+        { icon: 'fa-solid fa-mobile-screen', label: 'Container Flow', url: 'http://192.168.4.110:9470/' },
+        { icon: 'fa-solid fa-video', label: 'PatrolTube', url: 'http://192.168.4.110:8001/' },
+        { icon: 'fa-solid fa-camera-retro', label: 'ODOT Cameras', url: 'http://192.168.4.110:5173/' },
+        { icon: 'fa-solid fa-thumbtack', label: 'Police Radio', url: 'http://192.168.4.110:5050/' },
+        { icon: 'fa-solid fa-file-lines', label: 'Second Brain', url: 'http://192.168.4.110:8088/' },
+        { icon: 'fa-solid fa-globe', label: 'Terminal', url: 'http://192.168.4.110:7681/' },
+        { icon: 'fa-solid fa-laptop-code', label: 'VSCode', url: 'https://vscode.dev/' },
+        { icon: 'fa-brands fa-github', label: 'GitHub', url: 'https://github.com/brgjr10' }
       ]
     },
     {
@@ -193,6 +193,7 @@ export async function loadConfigAsync() {
       Object.assign(config, serverConfig);
       migrateLayoutToGrid();
       ensureConfigDefaults();
+      await applyWidgetDefaults();
       saveConfig();
       return;
     }
@@ -205,6 +206,7 @@ export async function loadConfigAsync() {
       config = JSON.parse(saved);
       migrateLayoutToGrid();
       ensureConfigDefaults();
+      await applyWidgetDefaults();
       saveConfig();
       return;
     }
@@ -212,7 +214,7 @@ export async function loadConfigAsync() {
     // Ignore
   }
   try {
-    const response = await fetch('data/widgets.json');
+    const response = await fetch(`data/widgets.json?_=${Date.now()}`);
     if (response.ok) {
       const fileConfig = await response.json();
       config = JSON.parse(JSON.stringify(fileConfig));
@@ -225,6 +227,32 @@ export async function loadConfigAsync() {
     // Ignore
   }
   loadConfig();
+}
+
+async function applyWidgetDefaults() {
+  if (!config) return;
+  try {
+    const response = await fetch(`data/widgets.json?_=${Date.now()}`);
+    if (!response.ok) return;
+    const fileConfig = await response.json();
+    const defaultsMap = new Map((fileConfig.widgets || []).map(w => [w.id, w]));
+    (config.widgets || []).forEach(w => {
+      const defaults = defaultsMap.get(w.id);
+      if (!defaults) return;
+      if (w.type === 'links' && Array.isArray(defaults.links) && Array.isArray(w.links)) {
+        w.links = defaults.links.map((def, i) => {
+          const existing = w.links[i];
+          if (!existing) return def;
+          return { ...def, url: existing.url || def.url, label: existing.label || def.label };
+        });
+        while (w.links.length < defaults.links.length) {
+          w.links.push(defaults.links[w.links.length]);
+        }
+      }
+    });
+  } catch (e) {
+    // Ignore
+  }
 }
 
 function ensureConfigDefaults() {
