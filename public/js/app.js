@@ -1,3 +1,20 @@
+import {
+  loadConfig,
+  loadConfigAsync,
+  getTheme,
+  setTheme,
+  applyTheme,
+  getUnit,
+  setUnit,
+  applyUnit,
+  getWidgets,
+  addWidget,
+  removeWidget,
+  updateWidget,
+  WIDGET_TYPES
+} from './config.js';
+import { WIDGET_CLASSES } from './widgets.js';
+
 let activeWidgets = [];
 let refreshTimers = {};
 let editMode = false;

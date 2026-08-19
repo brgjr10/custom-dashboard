@@ -1,3 +1,5 @@
+import { getUnit } from './config.js';
+
 class Widget {
   constructor(container, widgetConfig) {
     this.container = container;
@@ -599,7 +601,7 @@ class WeatherWidget extends Widget {
   }
 }
 
-const WIDGET_CLASSES = {
+export const WIDGET_CLASSES = {
   links: LinksWidget,
   system: SystemWidget,
   storage: StorageWidget,

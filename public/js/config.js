@@ -1,4 +1,4 @@
-const DEFAULT_CONFIG = {
+export const DEFAULT_CONFIG = {
   title: 'Home Dashboard',
   refreshInterval: 30000,
   theme: 'dark',
@@ -53,7 +53,7 @@ const DEFAULT_CONFIG = {
       refreshInterval: 30000,
       links: [
         { icon: '🚀', label: 'Uptime Kuma', url: 'http://192.168.4.90:3001/status/connection' },
-        { icon: '🐳', label: 'Portainer', url: 'http://192.168.4.110:9000' },
+        { icon: '🐳', label: 'Portainer', url: 'http://localhost:9000' },
         { icon: '📊', label: 'Pi-hole', url: 'http://192.168.4.90/admin/login' },
         { icon: '📦', label: 'ZimaOS', url: 'http://192.168.4.110/#/' },
         { icon: '🐙', label: 'OctoPi', url: 'http://192.168.4.34/' },
@@ -111,7 +111,7 @@ const DEFAULT_CONFIG = {
   ]
 };
 
-const WIDGET_TYPES = {
+export const WIDGET_TYPES = {
   links: {
     name: 'Quick Links',
     icon: '🔗',
@@ -162,10 +162,9 @@ const WIDGET_TYPES = {
   }
 };
 
-let config = null;
-let widgets = {};
+export let config = null;
 
-function loadConfig() {
+export function loadConfig() {
   try {
     const saved = localStorage.getItem('dashboard-config');
     if (saved) {
@@ -185,7 +184,7 @@ function loadConfig() {
   saveConfig();
 }
 
-async function loadConfigAsync() {
+export async function loadConfigAsync() {
   try {
     const saved = localStorage.getItem('dashboard-config');
     if (saved) {
@@ -197,6 +196,10 @@ async function loadConfigAsync() {
       }
       if (!config.unit) {
         config.unit = 'C';
+        saveConfig();
+      }
+      if (!config.refreshInterval) {
+        config.refreshInterval = 30000;
         saveConfig();
       }
       return;
@@ -228,7 +231,7 @@ async function loadConfigAsync() {
   loadConfig();
 }
 
-function migrateLayoutToGrid() {
+export function migrateLayoutToGrid() {
   if (!config || !config.widgets) return;
   
   const gutter = 16;
@@ -286,7 +289,7 @@ function migrateLayoutToGrid() {
   }
 }
 
-function saveConfig() {
+export function saveConfig() {
   try {
     localStorage.setItem('dashboard-config', JSON.stringify(config));
   } catch (e) {
@@ -294,47 +297,47 @@ function saveConfig() {
   }
 }
 
-function getTheme() {
+export function getTheme() {
   return config?.theme || 'dark';
 }
 
-function setTheme(theme) {
+export function setTheme(theme) {
   if (!config) return;
   config.theme = theme;
   saveConfig();
   applyTheme(theme);
 }
 
-function applyTheme(theme) {
+export function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   localStorage.setItem('dashboard-theme', theme);
   const select = document.getElementById('theme-select');
   if (select) select.value = theme;
 }
 
-function getUnit() {
+export function getUnit() {
   return config?.unit || 'C';
 }
 
-function setUnit(unit) {
+export function setUnit(unit) {
   if (!config) return;
   config.unit = unit === 'F' ? 'F' : 'C';
   saveConfig();
   applyUnit(unit);
 }
 
-function applyUnit(unit) {
+export function applyUnit(unit) {
   document.documentElement.setAttribute('data-unit', unit);
   localStorage.setItem('dashboard-unit', unit);
   const btn = document.getElementById('unit-toggle');
   if (btn) btn.textContent = unit === 'F' ? '°F' : '°C';
 }
 
-function getWidgets() {
+export function getWidgets() {
   return config.widgets.filter(w => w.enabled).sort((a, b) => a.order - b.order);
 }
 
-function addWidget(type, overrides = {}) {
+export function addWidget(type, overrides = {}) {
   const typeConfig = WIDGET_TYPES[type] || WIDGET_TYPES.custom;
   const newWidget = {
     id: `${type}-${Date.now()}`,
@@ -353,12 +356,12 @@ function addWidget(type, overrides = {}) {
   return newWidget;
 }
 
-function removeWidget(id) {
+export function removeWidget(id) {
   config.widgets = config.widgets.filter(w => w.id !== id);
   saveConfig();
 }
 
-function updateWidget(id, updates) {
+export function updateWidget(id, updates) {
   const widget = config.widgets.find(w => w.id === id);
   if (widget) {
     Object.assign(widget, updates);

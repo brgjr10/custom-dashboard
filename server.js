@@ -17,9 +17,52 @@ app.use(express.static('public', { setHeaders: (res) => {
   }
 }}));
 
+app.use('/api', basicAuth);
+
 const githubRequest = https.request;
 const githubAgent = 'Custom-Dashboard';
 const githubToken = process.env.GITHUB_TOKEN || '';
+
+const apiCache = new Map();
+
+function cacheGet(key, ttlMs) {
+  const entry = apiCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    apiCache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function cacheSet(key, value, ttlMs) {
+  apiCache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+function cacheClearPrefix(prefix) {
+  for (const key of apiCache.keys()) {
+    if (key.startsWith(prefix)) apiCache.delete(key);
+  }
+}
+
+const AUTH_USER = process.env.AUTH_USER || '';
+const AUTH_PASS = process.env.AUTH_PASS || '';
+
+function basicAuth(req, res, next) {
+  if (!AUTH_USER || !AUTH_PASS) return next();
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Basic ')) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="Dashboard"');
+    return res.status(401).send('Authentication required');
+  }
+  const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
+  const [user, pass] = decoded.split(':');
+  if (user === AUTH_USER && pass === AUTH_PASS) {
+    return next();
+  }
+  res.setHeader('WWW-Authenticate', 'Basic realm="Dashboard"');
+  res.status(401).send('Invalid credentials');
+}
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0B';
@@ -465,6 +508,12 @@ app.get('/api/github/contributions', async (req, res) => {
   }
 
   try {
+    const cacheKey = `github:contributions:${user}`;
+    if (!req.query._) {
+      const cached = cacheGet(cacheKey, 10 * 60 * 1000);
+      if (cached) return res.json(cached);
+    }
+
     const useViewer = !!githubToken;
     const graphqlQuery = useViewer ? `query {
       viewer {
@@ -531,7 +580,7 @@ app.get('/api/github/contributions', async (req, res) => {
 
     const userData = useViewer ? data.data?.viewer : data.data?.user || {};
     const weeks = userData.contributionsCollection?.contributionCalendar?.weeks || [];
-    res.json({
+    const payload = {
       weeks,
       user: {
         login: user,
@@ -545,7 +594,10 @@ app.get('/api/github/contributions', async (req, res) => {
         followingCount: userData.following?.totalCount || 0,
         publicReposCount: userData.repositories?.totalCount || 0
       }
-    });
+    };
+
+    cacheSet(cacheKey, payload, 10 * 60 * 1000);
+    res.json(payload);
   } catch (e) {
     res.json({ error: 'Failed to fetch GitHub contributions', weeks: [] });
   }
@@ -596,19 +648,29 @@ app.get('/api/github/activity', async (req, res) => {
   }
 
   try {
+    const cacheKey = `github:activity:${user}:${repo || 'all'}`;
+    if (!req.query._) {
+      const cached = cacheGet(cacheKey, 2 * 60 * 1000);
+      if (cached) return res.json(cached);
+    }
+
     let data;
     if (repo) {
       data = await makeGitHubRequest(`/repos/${user}/${repo}/events?per_page=10`);
       if (data.error) {
         return res.json({ error: data.error, events: [] });
       }
-      res.json({ events: data, user, repo });
+      const payload = { events: data, user, repo };
+      cacheSet(cacheKey, payload, 2 * 60 * 1000);
+      res.json(payload);
     } else {
       data = await makeGitHubRequest(`/users/${user}/events/public?per_page=30`);
       if (data.error) {
         return res.json({ error: data.error, events: [] });
       }
-      res.json({ events: data, user });
+      const payload = { events: data, user };
+      cacheSet(cacheKey, payload, 2 * 60 * 1000);
+      res.json(payload);
     }
   } catch (e) {
     res.json({ error: 'Failed to fetch GitHub activity', events: [] });
@@ -742,6 +804,12 @@ app.get('/api/geocode', async (req, res) => {
     return res.json({ error: 'Missing city parameter' });
   }
   try {
+    const cacheKey = `geocode:${city}:${state}`;
+    if (!req.query._) {
+      const cached = cacheGet(cacheKey, 60 * 60 * 1000);
+      if (cached) return res.json(cached);
+    }
+
     const query = state ? `${city}, ${state}` : city;
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`;
     const response = await fetch(url);
@@ -751,12 +819,14 @@ app.get('/api/geocode', async (req, res) => {
     if (!result) {
       return res.json({ error: 'Location not found' });
     }
-    res.json({
+    const payload = {
       latitude: result.latitude,
       longitude: result.longitude,
       name: result.name,
       country: result.country
-    });
+    };
+    cacheSet(cacheKey, payload, 60 * 60 * 1000);
+    res.json(payload);
   } catch (e) {
     res.json({ error: 'Failed to geocode location' });
   }
@@ -771,12 +841,14 @@ app.get('/api/weather', async (req, res) => {
   try {
     let resolvedLat = lat;
     let resolvedLon = lon;
+    let cacheKey = null;
 
     if ((!isNaN(resolvedLat) && !isNaN(resolvedLon)) || (!city)) {
       if (isNaN(resolvedLat) || isNaN(resolvedLon)) {
         resolvedLat = 44.06;
         resolvedLon = -121.31;
       }
+      cacheKey = `weather:${resolvedLat}:${resolvedLon}`;
     } else if (city) {
       const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city + (state ? ', ' + state : ''))}&count=1&language=en&format=json`;
       const geoRes = await fetch(geoUrl);
@@ -788,18 +860,27 @@ app.get('/api/weather', async (req, res) => {
       }
       resolvedLat = result.latitude;
       resolvedLon = result.longitude;
+      cacheKey = `weather:${resolvedLat}:${resolvedLon}`;
+    }
+
+    if (cacheKey && !req.query._) {
+      const cached = cacheGet(cacheKey, 10 * 60 * 1000);
+      if (cached) return res.json(cached);
     }
 
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${resolvedLat}&longitude=${resolvedLon}&current_weather=true`;
     const response = await fetch(url);
     if (!response.ok) throw new Error('Weather API error');
     const data = await response.json();
-    res.json({
+    const payload = {
       temperature: data.current_weather?.temperature || 0,
       windspeed: data.current_weather?.windspeed || 0,
       weathercode: data.current_weather?.weathercode || 0,
       updated: Date.now()
-    });
+    };
+
+    if (cacheKey) cacheSet(cacheKey, payload, 10 * 60 * 1000);
+    res.json(payload);
   } catch (e) {
     res.json({ error: 'Failed to fetch weather data' });
   }
