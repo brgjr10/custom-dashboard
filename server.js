@@ -465,7 +465,36 @@ app.get('/api/github/contributions', async (req, res) => {
   }
 
   try {
-    const graphqlQuery = `query {
+    const useViewer = !!githubToken;
+    const graphqlQuery = useViewer ? `query {
+      viewer {
+        avatarUrl
+        name
+        bio
+        location
+        company
+        url
+        followers(first: 0) {
+          totalCount
+        }
+        following(first: 0) {
+          totalCount
+        }
+        repositories(first: 0) {
+          totalCount
+        }
+        contributionsCollection {
+          contributionCalendar {
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+              }
+            }
+          }
+        }
+      }
+    }` : `query {
       user(login: "${user}") {
         avatarUrl
         name
@@ -500,7 +529,7 @@ app.get('/api/github/contributions', async (req, res) => {
       return res.json({ error: data.errors[0].message, weeks: [] });
     }
 
-    const userData = data.data?.user || {};
+    const userData = useViewer ? data.data?.viewer : data.data?.user || {};
     const weeks = userData.contributionsCollection?.contributionCalendar?.weeks || [];
     res.json({
       weeks,
