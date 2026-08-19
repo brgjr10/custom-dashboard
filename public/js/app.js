@@ -16,6 +16,86 @@ import {
 } from './config.js';
 import { WIDGET_CLASSES } from './widgets.js';
 
+function showDialog({ title, bodyHtml, buttons }) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('dialog-modal');
+    const titleEl = document.getElementById('dialog-title');
+    const bodyEl = document.getElementById('dialog-body');
+    const footerEl = document.getElementById('dialog-footer');
+    const closeBtn = document.getElementById('dialog-close');
+
+    titleEl.textContent = title || 'Dialog';
+    bodyEl.innerHTML = bodyHtml || '';
+    footerEl.innerHTML = '';
+
+    const defaultResult = buttons?.[0]?.value ?? null;
+
+    buttons?.forEach((btn) => {
+      const button = document.createElement('button');
+      button.className = `btn ${btn.class || 'btn-secondary'}`;
+      button.textContent = btn.label;
+      button.addEventListener('click', () => {
+        hideDialog();
+        resolve(btn.value);
+      });
+      footerEl.appendChild(button);
+    });
+
+    closeBtn.onclick = () => {
+      hideDialog();
+      resolve(defaultResult);
+    };
+
+    modal.style.display = 'flex';
+  });
+}
+
+function hideDialog() {
+  const modal = document.getElementById('dialog-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function showAlert(title, message) {
+  await showDialog({
+    title,
+    bodyHtml: `<p>${message}</p>`,
+    buttons: [{ label: 'OK', value: true, class: 'btn-primary' }]
+  });
+}
+
+async function showConfirm(title, message) {
+  return await showDialog({
+    title,
+    bodyHtml: `<p>${message}</p>`,
+    buttons: [
+      { label: 'Cancel', value: false, class: 'btn-secondary' },
+      { label: 'Confirm', value: true, class: 'btn-primary' }
+    ]
+  });
+}
+
+async function showPrompt(title, label, defaultValue = '') {
+  const result = await showDialog({
+    title,
+    bodyHtml: `
+      <div class="form-group">
+        <label>${label}</label>
+        <input type="text" id="dialog-input" value="${defaultValue.replace(/"/g, '&quot;')}">
+      </div>
+    `,
+    buttons: [
+      { label: 'Cancel', value: null, class: 'btn-secondary' },
+      { label: 'OK', value: '__ok__', class: 'btn-primary' }
+    ]
+  });
+
+  if (result === '__ok__') {
+    const input = document.getElementById('dialog-input');
+    return input?.value || '';
+  }
+  return null;
+}
+
 let activeWidgets = [];
 let refreshTimers = {};
 let editMode = false;
@@ -272,7 +352,7 @@ function renderWidgetTypes() {
   `).join('');
 
   container.querySelectorAll('.widget-type-option').forEach(option => {
-    option.addEventListener('click', () => {
+    option.addEventListener('click', async () => {
       const type = option.dataset.type;
       const typeConfig = WIDGET_TYPES[type];
       const overrides = {};
@@ -280,12 +360,12 @@ function renderWidgetTypes() {
       if (type === 'links') {
         overrides.links = [];
       } else if (type === 'github') {
-        overrides.user = prompt('GitHub username:', 'brgjr10');
+        overrides.user = await showPrompt('GitHub', 'Username', 'brgjr10');
         if (!overrides.user) return;
-        const repo = prompt('GitHub repo (leave blank for entire account):', '');
+        const repo = await showPrompt('GitHub', 'Repository (leave blank for entire account)', '');
         if (repo) overrides.repo = repo;
       } else if (type === 'custom') {
-        overrides.url = prompt('Enter URL:', 'http://192.168.4.90:3001/status/connection');
+        overrides.url = await showPrompt('Custom Widget', 'URL', 'http://192.168.4.90:3001/status/connection');
         if (!overrides.url) return;
       }
 
@@ -400,7 +480,7 @@ function setupEventListeners() {
     importInput.addEventListener('change', importLayout);
   }
 
-  document.getElementById('widget-grid')?.addEventListener('click', (e) => {
+  document.getElementById('widget-grid')?.addEventListener('click', async (e) => {
     if (!editMode) return;
     
     const widgetEl = e.target.closest('.widget');
@@ -413,7 +493,7 @@ function setupEventListeners() {
       const widgetId = widgetEl.dataset.id;
       
       if (action === 'remove') {
-        if (confirm('Remove this widget?')) {
+        if (await showConfirm('Remove Widget', 'Remove this widget?')) {
           removeWidget(widgetId);
           clearInterval(refreshTimers[widgetId]);
           renderDashboard();
@@ -424,7 +504,7 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('widget-grid')?.addEventListener('click', (e) => {
+  document.getElementById('widget-grid')?.addEventListener('click', async (e) => {
     const dockerAction = e.target.closest('.docker-action');
     if (!dockerAction) return;
     
@@ -446,37 +526,35 @@ function setupEventListeners() {
     dockerAction.disabled = true;
     dockerAction.textContent = '...';
     
-    fetch(endpoint, { method: 'POST' })
-      .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Action failed');
-        
-        const w = activeWidgets.find(aw => aw.config.id === widgetId);
-        if (w) {
-          w.widget.load().then(() => {
-            dockerAction.disabled = false;
-            dockerAction.textContent = action === 'start' ? '▶' : action === 'stop' ? '■' : '⟳';
-          });
-        }
-      })
-      .catch(err => {
-        alert(err.message);
+    try {
+      const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Action failed');
+      
+      const w = activeWidgets.find(aw => aw.config.id === widgetId);
+      if (w) {
+        await w.widget.load();
         dockerAction.disabled = false;
         dockerAction.textContent = action === 'start' ? '▶' : action === 'stop' ? '■' : '⟳';
-      });
+      }
+    } catch (err) {
+      await showAlert('Docker Error', err.message);
+      dockerAction.disabled = false;
+      dockerAction.textContent = action === 'start' ? '▶' : action === 'stop' ? '■' : '⟳';
+    }
   });
 }
 
-function configureWidget(widgetId) {
+async function configureWidget(widgetId) {
   const widgetConfig = config.widgets.find(w => w.id === widgetId);
   if (!widgetConfig) return;
 
   if (widgetConfig.type === 'links') {
     openLinkEditor(widgetId);
   } else if (widgetConfig.type === 'github') {
-    const user = prompt('GitHub username:', widgetConfig.user || '');
+    const user = await showPrompt('GitHub', 'Username', widgetConfig.user || 'brgjr10');
     if (!user) return;
-    const repo = prompt('GitHub repo (leave blank to track entire account):', widgetConfig.repo || '');
+    const repo = await showPrompt('GitHub', 'Repository (leave blank for entire account)', widgetConfig.repo || '');
     const updates = { user };
     if (repo) {
       updates.repo = repo;
@@ -490,19 +568,19 @@ function configureWidget(widgetId) {
       if (w) w.widget.load();
     }, 100);
   } else if (widgetConfig.type === 'custom') {
-    const url = prompt('Enter URL:', widgetConfig.url || 'http://192.168.4.90:3001/status/connection');
+    const url = await showPrompt('Custom Widget', 'URL', widgetConfig.url || 'http://192.168.4.90:3001/status/connection');
     if (!url) return;
     updateWidget(widgetId, { url });
     renderDashboard();
   } else if (widgetConfig.type === 'speedtest') {
-    const interval = prompt('Refresh interval (ms, 0 = manual):', widgetConfig.refreshInterval || 30000);
+    const interval = await showPrompt('Widget Settings', 'Refresh interval (ms, 0 = manual)', widgetConfig.refreshInterval || 30000);
     if (interval !== null) {
       updateWidget(widgetId, { refreshInterval: parseInt(interval) || 0 });
       renderDashboard();
     }
   } else if (widgetConfig.type === 'weather') {
-    const city = prompt('City:', widgetConfig.city || 'Bend');
-    const state = prompt('State:', widgetConfig.state || 'Oregon');
+    const city = await showPrompt('Weather', 'City', widgetConfig.city || 'Bend');
+    const state = await showPrompt('Weather', 'State', widgetConfig.state || 'Oregon');
     if (city !== null && state !== null) {
       updateWidget(widgetId, { city: city.trim(), state: state.trim() });
       renderDashboard();
@@ -542,20 +620,20 @@ function exportLayout() {
   URL.revokeObjectURL(url);
 }
 
-function importLayout(event) {
+async function importLayout(event) {
   const file = event.target.files[0];
   if (!file) return;
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
       const layout = JSON.parse(e.target.result);
       if (!layout.widgets || !Array.isArray(layout.widgets)) {
-        alert('Invalid layout file');
+        await showAlert('Invalid Layout', 'Invalid layout file');
         return;
       }
 
-      if (!confirm('This will replace your current layout. Continue?')) return;
+      if (!await showConfirm('Import Layout', 'This will replace your current layout. Continue?')) return;
 
       config.widgets = layout.widgets.map(w => ({
         id: w.id || `widget-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
@@ -577,9 +655,9 @@ function importLayout(event) {
 
       saveConfig();
       renderDashboard();
-      alert('Layout imported successfully');
+      await showAlert('Success', 'Layout imported successfully');
     } catch (err) {
-      alert('Failed to parse layout file: ' + err.message);
+      await showAlert('Import Failed', 'Failed to parse layout file: ' + err.message);
     }
   };
   reader.readAsText(file);
