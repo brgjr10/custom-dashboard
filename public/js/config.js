@@ -8,10 +8,10 @@ export const DEFAULT_CONFIG = {
       id: 'system-stats',
       type: 'system',
       title: 'System Stats',
-      gridCol: 1,
-      gridColSpan: 3,
+      gridCol: 7,
       gridRow: 1,
-      gridRowSpan: 4,
+      gridColSpan: 3,
+      gridRowSpan: 2,
       enabled: true,
       order: 0,
       refreshInterval: 30000
@@ -21,8 +21,8 @@ export const DEFAULT_CONFIG = {
       type: 'storage',
       title: 'Storage',
       gridCol: 7,
-      gridColSpan: 3,
       gridRow: 6,
+      gridColSpan: 3,
       gridRowSpan: 1,
       enabled: true,
       order: 1,
@@ -33,9 +33,9 @@ export const DEFAULT_CONFIG = {
       type: 'docker',
       title: 'Docker Containers',
       gridCol: 10,
-      gridColSpan: 3,
       gridRow: 1,
-      gridRowSpan: 6,
+      gridColSpan: 3,
+      gridRowSpan: 5,
       enabled: true,
       order: 2,
       refreshInterval: 30000
@@ -44,29 +44,89 @@ export const DEFAULT_CONFIG = {
       id: 'quick-links',
       type: 'links',
       title: 'Quick Links',
-      gridCol: 7,
-      gridColSpan: 3,
+      gridCol: 1,
       gridRow: 1,
-      gridRowSpan: 5,
+      gridColSpan: 3,
+      gridRowSpan: 3,
       enabled: true,
       order: 3,
       refreshInterval: 30000,
       links: [
-        { icon: 'fa-solid fa-rocket', label: 'Uptime Kuma', url: 'http://192.168.4.90:3001/status/connection' },
-        { icon: 'fa-brands fa-docker', label: 'Portainer', url: 'http://192.168.4.110:9000' },
-        { icon: 'fa-solid fa-ban', label: 'Pi-hole', url: 'http://192.168.4.90/admin/login' },
-        { icon: 'fa-solid fa-server', label: 'ZimaOS', url: 'http://192.168.4.110/#/' },
-        { icon: 'fa-solid fa-camera', label: 'OctoPi', url: 'http://192.168.4.34/' },
-        { icon: 'fa-solid fa-temperature-low', label: 'Cooler Control', url: 'http://192.168.4.110:11987/' },
-        { icon: 'fa-solid fa-house', label: 'Home Assistant', url: 'http://192.168.4.110:8123/dashboard-main' },
-        { icon: 'fa-solid fa-mobile-screen', label: 'Container Flow', url: 'http://192.168.4.110:9470/' },
-        { icon: 'fa-solid fa-video', label: 'PatrolTube', url: 'http://192.168.4.110:8001/' },
-        { icon: 'fa-solid fa-camera-retro', label: 'ODOT Cameras', url: 'http://192.168.4.110:5173/' },
-        { icon: 'fa-solid fa-thumbtack', label: 'Police Radio', url: 'http://192.168.4.110:5050/' },
-        { icon: 'fa-solid fa-file-lines', label: 'Second Brain', url: 'http://192.168.4.110:8088/' },
-        { icon: 'fa-solid fa-globe', label: 'Terminal', url: 'http://192.168.4.110:7681/' },
-        { icon: 'fa-solid fa-laptop-code', label: 'VSCode', url: 'https://vscode.dev/' },
-        { icon: 'fa-brands fa-github', label: 'GitHub', url: 'https://github.com/brgjr10' }
+        {
+          icon: 'fa-brands fa-docker',
+          label: 'Portainer',
+          url: 'http://192.168.4.110:9000'
+        },
+        {
+          icon: 'fa-solid fa-server',
+          label: 'ZimaOS',
+          url: 'http://192.168.4.110/#/'
+        },
+        {
+          icon: 'fa-solid fa-camera',
+          label: 'OctoPi',
+          url: 'http://192.168.4.34/'
+        },
+        {
+          icon: 'fa-solid fa-house',
+          label: 'Home Assistant',
+          url: 'http://192.168.4.110:8123/dashboard-main'
+        },
+        {
+          icon: 'fa-solid fa-diagram-project',
+          label: 'Container Flow',
+          url: 'http://192.168.4.110:9470/'
+        },
+        {
+          icon: 'fa-solid fa-video',
+          label: 'PatrolTube',
+          url: 'http://192.168.4.110:8001/'
+        },
+        {
+          icon: 'fa-solid fa-camera',
+          label: 'ODOT Cameras',
+          url: 'http://192.168.4.110:5173/'
+        },
+        {
+          icon: 'fa-solid fa-radio',
+          label: 'Police Radio',
+          url: 'http://192.168.4.110:5050/'
+        },
+        {
+          icon: 'fa-solid fa-brain',
+          label: 'Second Brain',
+          url: 'http://192.168.4.110:8088/'
+        },
+        {
+          icon: 'fa-solid fa-terminal',
+          label: 'Terminal',
+          url: 'http://192.168.4.110:7681/'
+        },
+        {
+          icon: 'fa-brands fa-microsoft',
+          label: 'VSCode',
+          url: 'https://vscode.dev/'
+        },
+        {
+          icon: 'fa-brands fa-github',
+          label: 'GitHub',
+          url: 'https://github.com/brgjr10'
+        },
+        {
+          icon: 'fa-brands fa-youtube',
+          label: 'YouTube',
+          url: 'https://youtube.com'
+        },
+        {
+          icon: 'fa-brands fa-facebook',
+          label: 'Facebook',
+          url: 'https://www.facebook.com/'
+        },
+        {
+          icon: 'fa-solid fa-bell',
+          label: 'Water Later',
+          url: 'https://watch-later-sigma.vercel.app/login'
+        }
       ]
     },
     {
@@ -74,8 +134,8 @@ export const DEFAULT_CONFIG = {
       type: 'github',
       title: 'GitHub Activity',
       gridCol: 1,
-      gridColSpan: 6,
       gridRow: 5,
+      gridColSpan: 6,
       gridRowSpan: 2,
       enabled: true,
       order: 4,
@@ -86,10 +146,10 @@ export const DEFAULT_CONFIG = {
       id: 'speedtest',
       type: 'speedtest',
       title: 'Internet Speed',
-      gridCol: 4,
+      gridCol: 7,
+      gridRow: 5,
       gridColSpan: 3,
-      gridRow: 1,
-      gridRowSpan: 4,
+      gridRowSpan: 1,
       enabled: true,
       order: 5,
       refreshInterval: 30000
@@ -98,10 +158,10 @@ export const DEFAULT_CONFIG = {
       id: 'weather',
       type: 'weather',
       title: 'Weather',
-      gridCol: 1,
-      gridColSpan: 6,
-      gridRow: 7,
-      gridRowSpan: 2,
+      gridCol: 4,
+      gridRow: 3,
+      gridColSpan: 3,
+      gridRowSpan: 1,
       enabled: true,
       order: 6,
       refreshInterval: 30000,
@@ -109,46 +169,57 @@ export const DEFAULT_CONFIG = {
       state: 'Ohio'
     },
     {
-      id: 'google-search',
+      id: 'search',
       type: 'search',
-      title: 'Google Search',
+      title: 'Search',
       gridCol: 7,
+      gridRow: 3,
       gridColSpan: 3,
-      gridRow: 7,
-      gridRowSpan: 2,
+      gridRowSpan: 1,
       enabled: true,
-      order: 7,
-      refreshInterval: 0,
-      query: ''
+      order: 10,
+      refreshInterval: 0
     },
     {
-      id: 'uptime-kuma',
+      id: 'uptime-kuma-1787358686729',
       type: 'uptime-kuma',
       title: 'Uptime Kuma',
-      gridCol: 1,
-      gridColSpan: 6,
-      gridRow: 9,
+      gridCol: 4,
+      gridRow: 1,
+      gridColSpan: 3,
       gridRowSpan: 2,
       enabled: true,
-      order: 7,
-      refreshInterval: 30000,
+      order: 10,
       baseUrl: 'http://192.168.4.90:3001',
-      slug: '',
-      mode: 'status'
+      slug: 'connection',
+      apiKey: 'uk3_CnaWzToZRDSGiY1gHL0LwhytI_grmbaEwy0GXVJd',
+      mode: 'metrics'
+    },
+    {
+      id: 'uptime',
+      type: 'uptime',
+      title: 'Uptime Kuma',
+      gridCol: 5,
+      gridRow: 9,
+      gridColSpan: 6,
+      gridRowSpan: 2,
+      enabled: true,
+      order: 12,
+      refreshInterval: 30000
     },
     {
       id: 'pihole',
       type: 'pihole',
-      title: 'Pi-hole',
-      gridCol: 7,
+      title: 'Pi-hole / AdGuard',
+      gridCol: 10,
+      gridRow: 6,
       gridColSpan: 3,
-      gridRow: 9,
-      gridRowSpan: 2,
+      gridRowSpan: 1,
       enabled: true,
-      order: 8,
+      order: 13,
       refreshInterval: 30000,
       baseUrl: 'http://192.168.4.90',
-      token: ''
+      password: 'da7ghuwmp8vs'
     }
   ]
 };
@@ -365,25 +436,6 @@ export function migrateLayoutToGrid() {
       if (widget.height !== undefined) {
         widget.gridRowSpan = Math.max(1, Math.round((parseInt(widget.height) || rowHeight) / (rowHeight + gutter)));
       }
-
-      delete widget.x;
-      delete widget.y;
-      delete widget.width;
-      delete widget.height;
-    }
-
-    if (!hasGridPositions && !hasOldPositions) {
-      needsMigration = true;
-      widget.gridCol = ((index % 3) * 4) + 1;
-      widget.gridColSpan = 4;
-      widget.gridRow = Math.floor(index / 3) + 1;
-      widget.gridRowSpan = 3;
-    }
-
-    if (widget.gridCol !== undefined && widget.gridRow === undefined) {
-      needsMigration = true;
-      widget.gridRow = Math.floor(index / 3) + 1;
-      widget.gridRowSpan = widget.gridRowSpan || 3;
     }
   });
 
@@ -392,85 +444,27 @@ export function migrateLayoutToGrid() {
   }
 }
 
-export function saveConfig() {
-  try {
-    localStorage.setItem('dashboard-config', JSON.stringify(config));
-  } catch (e) {
-    console.warn('Could not save config to localStorage');
-  }
-  try {
-    fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config)
-    }).catch(() => { });
-  } catch (e) {
-    // Ignore server sync errors
-  }
+export function getWidgets() {
+  if (!config || !config.widgets) return [];
+  return config.widgets
+    .filter(w => w.enabled !== false)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
 export function getTheme() {
   return config?.theme || 'dark';
 }
 
-export function setTheme(theme) {
-  if (!config) return;
-  config.theme = theme;
-  saveConfig();
-  applyTheme(theme);
-}
-
-export function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('dashboard-theme', theme);
-  const select = document.getElementById('theme-select');
-  if (select) select.value = theme;
-}
-
 export function getUnit() {
   return config?.unit || 'C';
 }
 
-export function setUnit(unit) {
-  if (!config) return;
-  config.unit = unit === 'F' ? 'F' : 'C';
-  saveConfig();
-  applyUnit(unit);
-}
-
-export function applyUnit(unit) {
-  document.documentElement.setAttribute('data-unit', unit);
-  localStorage.setItem('dashboard-unit', unit);
-  const btn = document.getElementById('unit-toggle');
-  if (btn) btn.textContent = unit === 'F' ? '°F' : '°C';
-}
-
-export function getWidgets() {
-  return config.widgets.filter(w => w.enabled).sort((a, b) => a.order - b.order);
-}
-
-export function addWidget(type, overrides = {}) {
-  const typeConfig = WIDGET_TYPES[type] || WIDGET_TYPES.custom;
-  const newWidget = {
-    id: `${type}-${Date.now()}`,
-    type,
-    title: typeConfig.name,
-    gridCol: 1,
-    gridRow: 1,
-    gridColSpan: 3,
-    gridRowSpan: 3,
-    enabled: true,
-    order: config.widgets.length,
-    ...overrides
-  };
-  config.widgets.push(newWidget);
-  saveConfig();
-  return newWidget;
-}
-
-export function removeWidget(id) {
-  config.widgets = config.widgets.filter(w => w.id !== id);
-  saveConfig();
+export function saveConfig() {
+  try {
+    localStorage.setItem('dashboard-config', JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save config:', e);
+  }
 }
 
 export function updateWidget(id, updates) {
@@ -480,4 +474,17 @@ export function updateWidget(id, updates) {
     saveConfig();
   }
   return widget;
+}
+
+export function removeWidget(id) {
+  const index = config.widgets.findIndex(w => w.id === id);
+  if (index !== -1) {
+    config.widgets.splice(index, 1);
+    saveConfig();
+  }
+}
+
+export function addWidget(widgetConfig) {
+  config.widgets.push(widgetConfig);
+  saveConfig();
 }
