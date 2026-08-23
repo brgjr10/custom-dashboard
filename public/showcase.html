@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Custom Dashboard — Project Showcase</title>
+  <link rel="stylesheet" href="css/dashboard.css?v=2">
+  <style>
+    .showcase-page { padding: 32px; max-width: 1200px; margin: 0 auto; }
+    .showcase-hero { text-align: center; margin-bottom: 48px; }
+    .showcase-hero h1 { font-size: 2.5rem; margin-bottom: 8px; }
+    .showcase-hero p { color: var(--text-secondary); font-size: 1.1rem; max-width: 720px; margin: 0 auto; }
+    .showcase-section { margin-bottom: 48px; }
+    .showcase-section h2 { font-size: 1.5rem; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border-color); }
+    .showcase-section p, .showcase-section li { color: var(--text-secondary); line-height: 1.7; }
+    .showcase-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 24px; }
+    .showcase-item { border: 1px solid var(--border-color); border-radius: var(--radius); overflow: hidden; background: var(--bg-card); }
+    .showcase-header { padding: 12px 16px; border-bottom: 1px solid var(--border-color); font-weight: 600; text-align: center; }
+    .showcase-preview { padding: 16px; min-height: 220px; }
+    .mock-widget { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 10px; margin-bottom: 10px; }
+    .mock-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 8px; }
+    .mock-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.75rem; color: var(--text-muted); }
+    .mock-bar { height: 6px; background: var(--bg-card); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+    .mock-bar-fill { height: 100%; background: var(--accent-blue); border-radius: 3px; }
+    .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .feature-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 16px; }
+    .feature-card h3 { font-size: 1rem; margin-bottom: 8px; }
+    .feature-card p { font-size: 0.875rem; color: var(--text-secondary); margin: 0; }
+    code { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 0.85em; }
+    pre { background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 16px; overflow-x: auto; color: var(--text-secondary); }
+    @media (max-width: 1200px) { .showcase-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 640px) { .showcase-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="showcase-page">
+    <div class="showcase-hero">
+      <h1>Custom Dashboard</h1>
+      <p>A configurable home server dashboard with modular widgets, drag-and-drop layout, theme support, and a local-first architecture. Built for reliability, readability, and speed.</p>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Themes</h2>
+      <div class="showcase-grid" id="showcase-grid"></div>
+    </div>
+
+    <div class="showcase-section">
+      <h2>How It Works</h2>
+      <p>The dashboard is split into three layers: the <strong>Express backend</strong> serves static assets and proxies local/external APIs; the <strong>widget engine</strong> fetches data and renders cards; the <strong>config layer</strong> persists layout and preferences in localStorage. All three communicate through a small, explicit API surface so the frontend stays framework-agnostic and the backend stays replaceable.</p>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Architecture</h2>
+      <pre>
+┌─────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Browser   │────▶│  server.js   │────▶│  Local APIs  │
+│  widgets.js │◀────│  Express API │◀────│  /sys, /dock │
+│  config.js  │     │  Static files│     └──────────────┘
+└─────────────┘     └──────┬──────┘
+                           │
+                    ┌──────▼──────┐
+                    │  External   │
+                    │  APIs       │
+                    │  GitHub,    │
+                    │  Open-Meteo │
+                    └─────────────┘
+      </pre>
+      <p style="margin-top:12px"><strong>server.js</strong> serves the <code>public/</code> folder, owns all routing, and centralizes cross-cutting concerns: auth, caching, and error formatting. Widgets never call external services directly; they go through <code>/api/*</code> so credentials stay server-side.</p>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Data Flow</h2>
+      <p>On startup, <code>config.js</code> loads persisted settings from localStorage (or falls back to <code>public/data/widgets.json</code>). <code>app.js</code> builds the grid from that config, instantiates each widget class from <code>widgets.js</code>, and starts per-widget refresh timers based on the global or per-widget interval. When a widget loads, it calls its own <code>fetchData()</code>, which hits an Express route; the route returns normalized JSON; the widget’s <code>format()</code> turns that into HTML.</p>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Features</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>⚡ Real-time Widgets</h3>
+          <p>System stats, Docker health, network info, speed tests, weather, and GitHub activity with configurable refresh intervals.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🎨 Theme System</h3>
+          <p>12 built-in themes using CSS custom properties. Switch instantly; preference persists across sessions.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🗂️ Drag & Drop Layout</h3>
+          <p>Arrange widgets in a CSS Grid. Resize from corners, reorder by dragging, and export/import layouts as JSON.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🔒 Optional Auth</h3>
+          <p>Enable basic HTTP auth with <code>AUTH_USER</code> and <code>AUTH_PASS</code> environment variables. Disabled by default for local use.</p>
+        </div>
+        <div class="feature-card">
+          <h3>📦 Zero Build Step</h3>
+          <p>Served directly from Express with ES modules. No bundler required for the frontend; backend caching reduces external API hits.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🐳 Docker Ready</h3>
+          <p>Runs in Docker with host networking and privileged mode for <code>nsenter</code>/Docker socket access. Secrets via <code>.env</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Setup</h2>
+      <pre>git clone https://github.com/brgjr10/custom-dashboard.git
+cd custom-dashboard
+cp .env.example .env
+# edit .env with your GITHUB_TOKEN, AUTH_USER, AUTH_PASS
+docker compose up -d --build</pre>
+      <p>Or run locally:</p>
+      <pre>npm install
+npm run dev</pre>
+    </div>
+
+    <div class="showcase-section">
+      <h2>APIs</h2>
+      <pre>
+Endpoint                 Description
+───────────────────────  ─────────────────────────────────────
+/api/system              CPU, memory, temperature, disks, uptime
+/api/docker              Container list and status
+/api/docker/:id/stats    Per-container CPU/memory/network
+/api/network             Network interfaces and IPs
+/api/weather             Current weather by city/state or lat/lon
+/api/geocode             Resolve city/state to coordinates
+/api/github/activity     GitHub events for a user or repo
+/api/github/contributions GitHub contribution calendar
+/api/speedtest           Download speed test
+/api/health              Server health check
+      </pre>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Widget System</h2>
+      <p>Every widget extends the base <code>Widget</code> class with three methods:</p>
+      <ul>
+        <li><code>fetchData()</code> — returns a Promise that resolves to widget data</li>
+        <li><code>format(data)</code> — returns an HTML string for the widget body</li>
+        <li><code>render()</code> — creates the DOM element with header, content, and footer</li>
+      </ul>
+      <p>Add a new widget by creating a class in <code>public/js/widgets.js</code>, registering it in <code>WIDGET_CLASSES</code>, and adding a config entry in <code>public/data/widgets.json</code>.</p>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Configuration</h2>
+      <p>Layout and widget settings are stored in <code>localStorage</code> as JSON. On first visit, the dashboard falls back to <code>public/data/widgets.json</code>. Global settings include theme, unit (°C/°F), and dashboard refresh interval. Per-widget settings include position, size, and refresh interval overrides.</p>
+    </div>
+
+    <div class="showcase-section">
+      <h2>Developer Experience</h2>
+      <p>Run <code>npm run dev</code> for hot-reload via nodemon. Frontend files are ES modules with explicit imports, making the dependency graph clear and enabling tree-shaking in future bundler migrations. Caching and auth are cross-cutting concerns in <code>server.js</code>, so they apply uniformly without touching widget code.</p>
+    </div>
+  </div>
+
+  <script>
+    const themes = [
+      { id: 'dark', name: 'Dark' },
+      { id: 'light', name: 'Light' },
+      { id: 'ocean', name: 'Ocean' },
+      { id: 'forest', name: 'Forest' },
+      { id: 'sunset', name: 'Sunset' },
+      { id: 'purple', name: 'Purple' },
+      { id: 'high-contrast', name: 'High Contrast' },
+      { id: 'midnight', name: 'Midnight' },
+      { id: 'rose', name: 'Rose' },
+      { id: 'slate', name: 'Slate' },
+      { id: 'amber', name: 'Amber' },
+      { id: 'neon', name: 'Neon' }
+    ];
+
+    const grid = document.getElementById('showcase-grid');
+    grid.innerHTML = themes.map(theme => `
+      <div class="showcase-item" data-theme="${theme.id}">
+        <div class="showcase-header">${theme.name}</div>
+        <div class="showcase-preview">
+          <div class="mock-widget">
+            <div class="mock-title">System Stats</div>
+            <div class="mock-row"><span>CPU</span><span>23%</span></div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:23%"></div></div>
+            <div class="mock-row" style="margin-top:8px"><span>Memory</span><span>4.2 / 16 GB</span></div>
+            <div class="mock-bar"><div class="mock-bar-fill" style="width:26%"></div></div>
+          </div>
+          <div class="mock-widget">
+            <div class="mock-title">Weather</div>
+            <div class="mock-row" style="justify-content:center;gap:8px">
+              <span>🌤️</span><span>72°F</span>
+            </div>
+          </div>
+          <div class="mock-widget">
+            <div class="mock-title">Quick Links</div>
+            <div class="mock-row"><span>🐳 Portainer</span></div>
+            <div class="mock-row"><span>📊 Pi-hole</span></div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  </script>
+</body>
+</html>

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home Dashboard</title>
+  <link rel="stylesheet" href="css/dashboard.css?v=2">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+  <div class="dashboard">
+    <header class="dashboard-header">
+      <div class="header-center">
+        <div class="datetime-date" id="datetime-date"></div>
+        <div class="datetime-time" id="datetime-time"></div>
+      </div>
+      <div class="header-right">
+        <button id="settings-toggle" class="btn btn-secondary settings-btn" title="Settings">⚙️</button>
+        <div class="settings-panel" id="settings-panel" style="display: none;">
+          <button id="add-widget-btn" class="btn btn-primary" title="Add Widget">+ Add Widget</button>
+          <button id="refresh-btn" class="btn btn-secondary" title="Refresh All">↻ Refresh</button>
+          <button id="edit-mode-btn" class="btn btn-secondary" title="Toggle Edit Mode">✎ Edit</button>
+          <button id="unit-toggle" class="btn btn-secondary unit-toggle" title="Toggle °C / °F">°C</button>
+          <select id="theme-select" class="theme-select" title="Choose theme">
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="ocean">Ocean</option>
+            <option value="forest">Forest</option>
+            <option value="sunset">Sunset</option>
+            <option value="purple">Purple</option>
+            <option value="high-contrast">High Contrast</option>
+            <option value="midnight">Midnight</option>
+            <option value="rose">Rose</option>
+            <option value="slate">Slate</option>
+            <option value="amber">Amber</option>
+            <option value="neon">Neon</option>
+          </select>
+          <select id="refresh-rate-select" class="theme-select" title="Dashboard refresh rate">
+            <option value="5000">5s</option>
+            <option value="15000">15s</option>
+            <option value="30000" selected>30s</option>
+            <option value="60000">1m</option>
+            <option value="300000">5m</option>
+            <option value="0">Off</option>
+          </select>
+          <button class="btn btn-danger" id="reset-layout-btn" title="Reset layout and settings to defaults">Reset Defaults</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="widget-grid" id="widget-grid">
+      <!-- Widgets render here -->
+    </div>
+
+    <div class="add-widget-panel" id="add-widget-panel" style="display: none;">
+      <div class="panel-header">
+        <h3>Add Widget</h3>
+        <button class="panel-close" id="close-panel">&times;</button>
+      </div>
+      <div class="widget-types" id="widget-types">
+        <!-- Widget type options -->
+      </div>
+    </div>
+
+    <div class="edit-banner" id="edit-banner" style="display: none;">
+      <div class="edit-banner-content">
+        <span>Edit Mode — drag to move, resize from corner, configure or remove</span>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" id="export-layout">Export Layout</button>
+          <label class="btn btn-secondary" style="cursor: pointer;">
+            Import Layout
+            <input type="file" id="import-layout" accept=".json" style="display: none;">
+          </label>
+          <button class="btn btn-danger" id="save-layout">Done</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="link-editor-modal" id="link-editor-modal" style="display: none;">
+      <div class="link-editor-content">
+        <div class="panel-header">
+          <h3>Edit Links</h3>
+          <button class="panel-close" id="close-link-editor">&times;</button>
+        </div>
+        <div class="link-editor-list" id="link-editor-list">
+          <!-- Links render here -->
+        </div>
+        <div class="link-editor-footer">
+          <button class="btn btn-secondary" id="add-link-btn">+ Add Link</button>
+          <button class="btn btn-primary" id="save-links-btn">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="dialog-modal" id="dialog-modal" style="display: none;">
+      <div class="dialog-content">
+        <div class="panel-header">
+          <h3 id="dialog-title">Dialog</h3>
+          <button class="panel-close" id="dialog-close">&times;</button>
+        </div>
+        <div class="dialog-body" id="dialog-body"></div>
+        <div class="dialog-footer" id="dialog-footer"></div>
+      </div>
+    </div>
+
+    <div class="emoji-picker" id="emoji-picker">
+      <!-- Emojis render here -->
+    </div>
+
+    <div class="icon-picker" id="icon-picker">
+      <!-- FontAwesome icons render here -->
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+node_modules/
+npm-debug.log
+.DS_Store
+*.log
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.env
+.env.local
+.env.production
+*.pid
+*.seed
