@@ -488,3 +488,27 @@ export function addWidget(widgetConfig) {
   config.widgets.push(widgetConfig);
   saveConfig();
 }
+
+export function setTheme(theme) {
+  if (!config) return;
+  config.theme = theme;
+  saveConfig();
+}
+
+export function applyTheme(theme) {
+  if (!theme) return;
+  document.documentElement.setAttribute('data-theme', theme);
+}
+
+export function setUnit(unit) {
+  if (!config) return;
+  config.unit = unit;
+  saveConfig();
+}
+
+export function applyUnit(unit) {
+  if (!unit) return;
+  document.querySelectorAll('[data-unit]').forEach(el => {
+    el.textContent = unit;
+  });
+}
