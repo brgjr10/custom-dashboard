@@ -1925,3 +1925,16 @@ body {
 .search-open:hover {
   color: var(--accent-blue);
 }
+
+/* Available to screen readers but not shown on screen, for controls that have no visible label. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -1,4 +1,4 @@
-import { getUnit } from './config.js';
+import { getUnit, escapeHtml, sanitizeUrl } from './config.js';
 
 class Widget {
   constructor(container, widgetConfig) {
@@ -13,10 +13,10 @@ class Widget {
     this.element.dataset.id = this.config.id;
     this.element.innerHTML = `
       <div class="widget-header">
-        <span class="widget-title">${this.config.title}</span>
+        <span class="widget-title">${escapeHtml(this.config.title)}</span>
         <div class="widget-actions">
-          <button class="widget-action" data-action="configure" title="Configure">⚙</button>
-          <button class="widget-action" data-action="remove" title="Remove">×</button>
+          <button class="widget-action" data-action="configure" title="Configure" aria-label="Configure widget">⚙</button>
+          <button class="widget-action" data-action="remove" title="Remove" aria-label="Remove widget">×</button>
         </div>
       </div>
       <div class="widget-content">
@@ -32,28 +32,24 @@ class Widget {
 
   async load() {
     const hasExistingContent = this.contentEl.innerHTML && !this.contentEl.innerHTML.includes('Loading...');
-    console.log(`[${this.config.type} widget ${this.config.id}] load() hasExistingContent=${hasExistingContent}`);
     if (!hasExistingContent) {
       this.contentEl.innerHTML = '<div class="loading">Loading...</div>';
     }
     try {
       const data = await this.fetchData();
-      console.log(`[${this.config.type} widget ${this.config.id}] fetchData done: error=${!!data.error}`);
+      // On a refresh error the previous render is kept, but on the first load there is
+      // nothing to keep, so format() runs and the widget's own error branch is shown.
       if (data.error && hasExistingContent) {
-        console.log(`[${this.config.type} widget ${this.config.id}] Keeping existing content (error on refresh)`);
         return;
       }
-      if (!data.error) {
-        this.contentEl.innerHTML = this.format(data);
-        if (data.updated) {
-          this.footerEl.textContent = `Updated: ${new Date(data.updated).toLocaleTimeString()}`;
-        }
-        console.log(`[${this.config.type} widget ${this.config.id}] Content updated`);
+      this.contentEl.innerHTML = this.format(data);
+      if (data.updated) {
+        this.footerEl.textContent = `Updated: ${new Date(data.updated).toLocaleTimeString()}`;
       }
     } catch (err) {
-      console.error(`[${this.config.type} widget ${this.config.id}] load() threw:`, err.message);
+      console.error(`[${this.config.type} widget ${this.config.id}] load() threw: ${err.message}`);
       if (!hasExistingContent) {
-        this.contentEl.innerHTML = '<div class="loading">Loading...</div>';
+        this.contentEl.innerHTML = '<div class="empty-state">Failed to load: ' + escapeHtml(err.message) + '</div>';
       }
     }
   }
@@ -110,11 +106,11 @@ class LinksWidget extends Widget {
       return '<div class="empty-state">No links configured</div>';
     }
     const linksHtml = data.links.map(link => {
-      const icon = link.icon ? (link.icon.startsWith('fa-') ? `<i class="${link.icon}"></i>` : link.icon) : '<i class="fa-solid fa-link"></i>';
+      const icon = link.icon ? (link.icon.startsWith('fa-') ? `<i class="${escapeHtml(link.icon)}" aria-hidden="true"></i>` : escapeHtml(link.icon)) : '<i aria-hidden="true" class="fa-solid fa-link" aria-hidden="true"></i>';
       return `
-        <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="link-item">
+        <a href="${escapeHtml(sanitizeUrl(link.url))}" target="_blank" rel="noopener noreferrer" class="link-item">
           <span class="link-icon">${icon}</span>
-          <span class="link-label">${link.label}</span>
+          <span class="link-label">${escapeHtml(link.label)}</span>
         </a>
       `;
     }).join('');
@@ -217,7 +213,7 @@ class StorageWidget extends Widget {
     return `
       <div class="disk-item">
         <div class="disk-header">
-          <span class="disk-name"><i class="fa-solid fa-hard-drive"></i> Total Storage</span>
+          <span class="disk-name"><i aria-hidden="true" class="fa-solid fa-hard-drive"></i> Total Storage</span>
           <span class="disk-percent">${percent}%</span>
         </div>
         <div class="stat-bar">
@@ -261,7 +257,7 @@ class DockerWidget extends Widget {
 
   format(data) {
     if (data.error) {
-      return `<div class="empty-state">${data.error}</div>`;
+      return `<div class="empty-state">${escapeHtml(data.error)}</div>``;
     }
     if (!data.containers || data.containers.length === 0) {
       return '<div class="empty-state">No containers found</div>';
@@ -323,9 +319,9 @@ class DockerWidget extends Widget {
           <span style="font-size: 0.75rem; color: var(--text-muted);">${statusText}</span>
           ${resourceHtml}
           <div class="docker-actions">
-            <button class="docker-action" data-action="start" data-id="${containerId}" title="Start"><i class="fa-solid fa-play"></i></button>
-            <button class="docker-action" data-action="stop" data-id="${containerId}" title="Stop"><i class="fa-solid fa-stop"></i></button>
-            <button class="docker-action" data-action="restart" data-id="${containerId}" title="Restart"><i class="fa-solid fa-rotate"></i></button>
+            <button class="docker-action" data-action="start" data-id="${containerId}" title="Start"><i aria-hidden="true" class="fa-solid fa-play"></i></button>
+            <button class="docker-action" data-action="stop" data-id="${containerId}" title="Stop"><i aria-hidden="true" class="fa-solid fa-stop"></i></button>
+            <button class="docker-action" data-action="restart" data-id="${containerId}" title="Restart"><i aria-hidden="true" class="fa-solid fa-rotate"></i></button>
           </div>
         </div>
       `;
@@ -372,7 +368,7 @@ class GitHubWidget extends Widget {
 
   format(data) {
     if (data.error) {
-      return `<div class="empty-state">${data.error}<br><small style="color: var(--text-muted);">Set GITHUB_TOKEN env var to fix rate limits</small></div>`;
+      return `<div class="empty-state">${escapeHtml(data.error)}<br><small style="color: var(--text-muted);">Set GITHUB_TOKEN env var to fix rate limits</small></div>`;
     }
     if (!data.weeks || data.weeks.length === 0) {
       return '<div class="empty-state">No contribution data</div>';
@@ -444,7 +440,7 @@ class GitHubWidget extends Widget {
     html += '<div class="github-info">';
     
     if (profile.name) {
-      html += `<div class="github-name"><i class="fa-brands fa-github"></i> ${profile.name}</div>`;
+      html += `<div class="github-name"><i aria-hidden="true" class="fa-brands fa-github"></i> ${profile.name}</div>`;
     }
     
     if (profile.bio) {
@@ -536,7 +532,7 @@ class SpeedtestWidget extends Widget {
     if (data.error) {
       return `
         <div class="speed-value">
-          <div class="empty-state">${data.error}</div>
+          <div class="empty-state">${escapeHtml(data.error)}</div>
         </div>
       `;
     }
@@ -546,12 +542,12 @@ class SpeedtestWidget extends Widget {
       <div class="speed-value">
         <div class="speed-grid">
           <div class="speed-item">
-            <div class="speed-label"><i class="fa-solid fa-download"></i> Download</div>
+            <div class="speed-label"><i aria-hidden="true" class="fa-solid fa-download"></i> Download</div>
             <div class="speed-number">${data.download || 'N/A'}</div>
             <div class="speed-unit">Mbps</div>
           </div>
           <div class="speed-item">
-            <div class="speed-label"><i class="fa-solid fa-upload"></i> Upload</div>
+            <div class="speed-label"><i aria-hidden="true" class="fa-solid fa-upload"></i> Upload</div>
             <div class="speed-number">${data.upload || 'N/A'}</div>
             <div class="speed-unit">Mbps</div>
           </div>
@@ -574,7 +570,7 @@ class CustomWidget extends Widget {
       return this.config.html;
     }
     if (this.config.url) {
-      return `<iframe class="grafana-iframe" src="${this.config.url}" frameborder="0"></iframe>`;
+      return `<iframe class="grafana-iframe" src="${escapeHtml(sanitizeUrl(this.config.url))}" frameborder="0" title="${escapeHtml(this.config.title || 'Embedded view')}"></iframe>`;
     }
     return '<div class="empty-state">Configure this widget</div>';
   }
@@ -595,11 +591,12 @@ class SearchWidget extends Widget {
             type="text"
             class="search-input"
             placeholder="Google Search..."
-            value="${query.replace(/"/g, '&quot;')}"
+            aria-label="Google Search"
+            value="${escapeHtml(query)}"
             data-search-input
           />
           <button type="submit" class="search-btn">
-            <i class="fa-solid fa-magnifying-glass"></i>
+            <i aria-hidden="true" class="fa-solid fa-magnifying-glass"></i>
           </button>
         </form>
         <a class="search-open" href="${searchUrl}" target="_blank" rel="noopener noreferrer">Open in Google</a>
@@ -619,7 +616,7 @@ class NetworkWidget extends Widget {
 
   format(data) {
     if (data.error) {
-      return `<div class="empty-state">${data.error}</div>`;
+      return `<div class="empty-state">${escapeHtml(data.error)}</div>``;
     }
     const interfaces = data.interfaces || [];
     const html = interfaces.map(iface => {
@@ -627,7 +624,7 @@ class NetworkWidget extends Widget {
       if (!ips) return '';
       return `
         <div class="network-interface">
-          <div class="network-name"><i class="fa-solid fa-network-wired"></i> ${iface.name}</div>
+          <div class="network-name"><i aria-hidden="true" class="fa-solid fa-network-wired"></i> ${iface.name}</div>
           <div class="network-ips">${ips}</div>
         </div>
       `;
@@ -649,7 +646,7 @@ class WeatherWidget extends Widget {
 
   format(data) {
     if (data.error) {
-      return `<div class="empty-state">${data.error}</div>`;
+      return `<div class="empty-state">${escapeHtml(data.error)}</div>``;
     }
     const weatherIcons = {
       0: '☀️', 1: '🌤️', 2: '⛅', 3: '☁️',
@@ -667,7 +664,7 @@ class WeatherWidget extends Widget {
       <div class="weather-display">
         <div class="weather-icon">${icon}</div>
         <div class="weather-temp">${temp}°${unit}</div>
-        <div class="weather-wind"><i class="fa-solid fa-wind"></i> ${convertWindSpeed(data.windspeed)} ${unit === 'F' ? 'mph' : 'km/h'}</div>
+        <div class="weather-wind"><i aria-hidden="true" class="fa-solid fa-wind"></i> ${convertWindSpeed(data.windspeed)} ${unit === 'F' ? 'mph' : 'km/h'}</div>
       </div>
     `;
   }
@@ -677,17 +674,16 @@ class UptimeKumaWidget extends Widget {
   async fetchData() {
     const baseUrl = this.config.baseUrl || 'http://192.168.4.90:3001';
     const slug = this.config.slug || '';
-    const apiKey = this.config.apiKey || '';
     const mode = this.config.mode || 'status';
 
-    const params = new URLSearchParams();
-    params.set('baseUrl', baseUrl);
-    params.set('slug', slug);
-    params.set('apiKey', apiKey);
-    params.set('mode', mode);
-
-    const response = await fetch(`/api/uptime-kuma?${params.toString()}`);
-    if (!response.ok) throw new Error('Failed to fetch Uptime Kuma data');
+    // Credentials stay on the server; the widget no longer carries or transmits the API
+    // key, so it cannot end up in a proxy access log or browser history.
+    const response = await fetch('/api/uptime-kuma', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseUrl, slug, mode })
+    });
+    if (!response.ok && response.status !== 400) throw new Error(`Uptime Kuma request failed: ${response.status}`);
     const data = await response.json();
     data.updated = Date.now();
     return data;
@@ -695,7 +691,7 @@ class UptimeKumaWidget extends Widget {
 
   format(data) {
     if (data.error) {
-      return `<div class="empty-state">${data.error}</div>`;
+      return `<div class="empty-state">${escapeHtml(data.error)}</div>``;
     }
     const monitors = data.monitors || [];
     if (monitors.length === 0) {
@@ -740,8 +736,8 @@ class UptimeKumaWidget extends Widget {
       return `
         <div class="kuma-monitor">
           <span class="kuma-monitor-icon">${icon}</span>
-          <span class="kuma-monitor-name">${mon.name}</span>
-          <span class="kuma-monitor-type">${mon.type}</span>
+          <span class="kuma-monitor-name">${escapeHtml(mon.name)}</span>
+          <span class="kuma-monitor-type">${escapeHtml(mon.type)}</span>
           ${responseTime ? `<span class="kuma-monitor-time">${responseTime}</span>` : ''}
         </div>
       `;
@@ -759,32 +755,25 @@ class UptimeKumaWidget extends Widget {
 class PiHoleWidget extends Widget {
   async fetchData() {
     const baseUrl = this.config.baseUrl || 'http://192.168.4.90';
-    const password = this.config.password || '';
-    const url = `/api/pihole?${new URLSearchParams({ baseUrl, ...(password ? { password } : {}) }).toString()}`;
-    console.log(`[Pi-hole widget] Loading: ${url}`);
-    const t0 = performance.now();
-    const response = await fetch(url);
-    const elapsed = (performance.now() - t0).toFixed(0);
-    console.log(`[Pi-hole widget] Response: status=${response.status}, ${elapsed}ms`);
-    if (!response.ok) {
-      console.error(`[Pi-hole widget] HTTP error: ${response.status} ${response.statusText}`);
+    // The password is a server-side secret; only the host travels from the browser.
+    const response = await fetch('/api/pihole', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ baseUrl })
+    });
+    if (!response.ok && response.status !== 400) {
       throw new Error(`Pi-hole request failed: ${response.status}`);
     }
     const data = await response.json();
     if (!data.error) {
       data.updated = Date.now();
     }
-    if (data.error) {
-      console.error(`[Pi-hole widget] API error:`, data.error, data.retryAfter ? `(retry in ${data.retryAfter / 1000}s)` : '');
-    } else {
-      console.log(`[Pi-hole widget] Data received:`, { queries: data.queries, blocked: data.blocked, percent: data.percent });
-    }
     return data;
   }
 
   format(data) {
     if (data.error) {
-      return `<div class="empty-state">${data.error}</div>`;
+      return `<div class="empty-state">${escapeHtml(data.error)}</div>``;
     }
 
     return `

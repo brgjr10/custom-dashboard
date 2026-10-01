@@ -6,3 +6,14 @@ README.md
 docker-compose.yml
 Dockerfile
 .dockerignore
+
+# Secrets must arrive as runtime env vars, never as image layers.
+.env
+.env.*
+!.env.example
+
+# Runtime state and test artifacts
+public/data
+.github
+test
+.qa-tmp

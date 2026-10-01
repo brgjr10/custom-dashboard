@@ -5,7 +5,8 @@ const os = require('os');
 const http = require('http');
 const https = require('https');
 const net = require('net');
-const { execSync } = require('child_process');
+const crypto = require('crypto');
+const { exec } = require('child_process');
 
 try {
   require('dotenv').config();
@@ -16,20 +17,56 @@ try {
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(express.json());
+const AUTH_USER = process.env.AUTH_USER || '';
+const AUTH_PASS = process.env.AUTH_PASS || '';
+const ALLOW_ANONYMOUS = process.env.ALLOW_ANONYMOUS === 'true';
+const AUTH_ENABLED = Boolean(AUTH_USER && AUTH_PASS);
+
+app.disable('x-powered-by');
+
+// Hand-rolled rather than helmet: the repo has only dotenv + express and the brief forbids
+// adding dependencies. CSP is the real mitigation behind the innerHTML sinks.
+function securityHeaders(req, res, next) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Content-Security-Policy', [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net 'unsafe-inline'",
+    "font-src 'self' data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+    "img-src 'self' data: https:",
+    "connect-src 'self'",
+    "frame-src 'self' http: https:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'"
+  ].join('; '));
+  next();
+}
+
+app.use(securityHeaders);
+
+// Auth covers the whole app, not just /api, and it runs before the body parser and the
+// static mount so no asset can be fetched without credentials.
+app.use(basicAuth);
+
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public', { setHeaders: (res) => {
-  if (res.req.url.match(/\.(css|js|html)$/)) {
+  // Query strings defeated the previous `$`-anchored regex, so `?v=` bumps silently
+  // escaped the rule; the extension is read from the path instead.
+  const ext = path.extname(res.req.path || '');
+  if (['.css', '.js', '.html'].includes(ext) || (res.req.path || '').endsWith('/')) {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   }
 }}));
-
-app.use('/api', basicAuth);
 
 const githubRequest = https.request;
 const githubAgent = 'Custom-Dashboard';
 const githubToken = process.env.GITHUB_TOKEN || '';
 
 const apiCache = new Map();
+const API_CACHE_MAX = 500;
 
 function cacheGet(key, ttlMs) {
   const entry = apiCache.get(key);
@@ -42,6 +79,12 @@ function cacheGet(key, ttlMs) {
 }
 
 function cacheSet(key, value, ttlMs) {
+  // Keys embed request input, so the map is capped and evicted in insertion order
+  // rather than growing for the lifetime of the process.
+  if (apiCache.size >= API_CACHE_MAX) {
+    const oldest = apiCache.keys().next();
+    if (!oldest.done) apiCache.delete(oldest.value);
+  }
   apiCache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }
 
@@ -51,43 +94,76 @@ function cacheClearPrefix(prefix) {
   }
 }
 
-const AUTH_USER = process.env.AUTH_USER || '';
-const AUTH_PASS = process.env.AUTH_PASS || '';
+const cacheSweepTimer = setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of apiCache) {
+    if (now > entry.expiresAt) apiCache.delete(key);
+  }
+}, 60 * 1000);
+cacheSweepTimer.unref();
 
 function basicAuth(req, res, next) {
-  if (!AUTH_USER || !AUTH_PASS) return next();
+  // The container HEALTHCHECK needs an unauthenticated liveness signal, and this route
+  // returns nothing but status and uptime.
+  if (req.method === 'GET' && req.path === '/api/health') return next();
+  if (!AUTH_ENABLED) return next();
   const auth = req.headers.authorization;
   if (!auth || !auth.startsWith('Basic ')) {
     res.setHeader('WWW-Authenticate', 'Basic realm="Dashboard"');
     return res.status(401).send('Authentication required');
   }
   const decoded = Buffer.from(auth.slice(6), 'base64').toString('utf8');
-  const [user, pass] = decoded.split(':');
-  if (user === AUTH_USER && pass === AUTH_PASS) {
+  // A password may legitimately contain ':', so only split on the first one.
+  const sep = decoded.indexOf(':');
+  const user = sep === -1 ? decoded : decoded.slice(0, sep);
+  const pass = sep === -1 ? '' : decoded.slice(sep + 1);
+  const ok = safeEqual(user, AUTH_USER) && safeEqual(pass, AUTH_PASS);
+  if (ok) {
     return next();
   }
   res.setHeader('WWW-Authenticate', 'Basic realm="Dashboard"');
   res.status(401).send('Invalid credentials');
 }
 
-function formatBytes(bytes) {
-  if (bytes === 0) return '0B';
-  const k = 1024;
-  const sizes = ['B', 'K', 'M', 'G', 'T'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i];
+// timingSafeEqual throws on length mismatch, which would itself leak the secret's length.
+function safeEqual(a, b) {
+  const bufA = Buffer.from(String(a), 'utf8');
+  const bufB = Buffer.from(String(b), 'utf8');
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function getDisks() {
+// Async so a slow shell-out cannot stall the event loop (a blocking execSync here cost
+// every concurrent request ~2.6s). Resolves to '' on failure, matching the old catch.
+function runCommand(command, timeout = 5000) {
+  return new Promise((resolve) => {
+    exec(command, { encoding: 'utf8', timeout, windowsHide: true }, (err, stdout) => {
+      resolve(err ? '' : stdout || '');
+    });
+  });
+}
+
+let disksCache = null;
+let disksCacheAt = 0;
+const DISKS_TTL = 30000;
+
+async function getDisks() {
+  if (disksCache && Date.now() - disksCacheAt < DISKS_TTL) {
+    return disksCache;
+  }
+  const disks = await collectDisks();
+  disksCache = disks;
+  disksCacheAt = Date.now();
+  return disks;
+}
+
+async function collectDisks() {
   const platform = os.platform();
   const disks = [];
 
   if (platform === 'win32') {
     try {
-      const output = execSync('powershell -Command "Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter,Size,SizeRemaining,FileSystemType | ConvertTo-Json"', {
-        encoding: 'utf8',
-        timeout: 5000
-      });
+      const output = await runCommand('powershell -Command "Get-Volume | Where-Object DriveLetter | Select-Object DriveLetter,Size,SizeRemaining,FileSystemType | ConvertTo-Json"');
       const volumes = JSON.parse(output);
       volumes.forEach(vol => {
         const size = vol.Size / 1024 / 1024 / 1024;
@@ -118,14 +194,14 @@ function getDisks() {
       let dfOutput = '';
 
       try {
-        dfOutput = execSync('nsenter -t 1 -m df -h -T', { encoding: 'utf8' });
+        dfOutput = await runCommand('nsenter -t 1 -m df -h -T');
       } catch (e) {
         dfOutput = '';
       }
 
       if (!dfOutput) {
         try {
-          dfOutput = execSync('df -h -T', { encoding: 'utf8' });
+          dfOutput = await runCommand('df -h -T');
         } catch (e) {
           dfOutput = '';
         }
@@ -188,7 +264,7 @@ function getDisks() {
   return disks;
 }
 
-app.get('/api/system', (req, res) => {
+app.get('/api/system', async (req, res) => {
   try {
     const cpus = os.cpus();
     const totalMem = os.totalmem();
@@ -250,7 +326,7 @@ app.get('/api/system', (req, res) => {
         percent: Math.round(((totalMem - freeMem) / totalMem) * 100)
       },
       temp: cpuTemp,
-      disks: getDisks(),
+      disks: await getDisks(),
       uptime: os.uptime(),
       hostname: os.hostname(),
       platform: os.platform(),
@@ -274,7 +350,7 @@ function cpuUsage(cpus) {
   return Math.round(((totalTick - totalIdle) / totalTick) * 100);
 }
 
-app.get('/api/docker', (req, res) => {
+app.get('/api/docker', async (req, res) => {
   const platform = os.platform();
   if (platform === 'win32') {
     return res.json({
@@ -283,7 +359,7 @@ app.get('/api/docker', (req, res) => {
     });
   }
 
-  const socketPath = '/var/run/docker.sock';
+  const socketPath = DOCKER_SOCKET;
   if (!fs.existsSync(socketPath)) {
     return res.json({
       containers: [],
@@ -291,157 +367,98 @@ app.get('/api/docker', (req, res) => {
     });
   }
 
-  const socket = net.connect({ path: socketPath }, () => {
-    const request = `GET /containers/json?all=true HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nAccept: application/json\r\n\r\n`;
-    socket.write(request);
-  });
-
-  let headerBuffer = '';
-  let bodyBuffer = '';
-  let headersComplete = false;
-
-  socket.on('data', chunk => {
-    const str = chunk.toString();
-    if (!headersComplete) {
-      headerBuffer += str;
-      const headerEnd = headerBuffer.indexOf('\r\n\r\n');
-      if (headerEnd !== -1) {
-        headersComplete = true;
-        const bodyPart = headerBuffer.substring(headerEnd + 4);
-        headerBuffer = '';
-        bodyBuffer = decodeChunked(bodyPart);
-      }
-    } else {
-      bodyBuffer += decodeChunked(str);
-    }
-  });
-
-  socket.on('end', () => {
-    try {
-      const trimmed = bodyBuffer.trim();
-      if (!trimmed) {
-        return res.json({ containers: [], error: 'Empty Docker response' });
-      }
-      const containers = JSON.parse(trimmed);
-      res.json({ containers });
-    } catch (e) {
-      console.error('Docker raw response:', bodyBuffer);
-      res.json({ containers: [], error: 'Failed to parse Docker response: ' + e.message });
-    }
-  });
-
-  socket.on('error', () => {
-    res.json({ containers: [], error: 'Cannot connect to Docker socket' });
-  });
+  try {
+    const containers = await dockerRequest('GET', '/containers/json?all=true');
+    res.json({ containers: Array.isArray(containers) ? containers : [] });
+  } catch (e) {
+    res.json({ containers: [], error: e.message });
+  }
 });
 
-function dockerSocketRequest(path, method = 'POST', body = null) {
+const DOCKER_SOCKET = process.env.DOCKER_SOCKET || '/var/run/docker.sock';
+
+// Container ids and names may only contain these characters. Without this the value was
+// interpolated straight into a request line, which allowed path traversal and request
+// splitting against the daemon.
+const CONTAINER_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/;
+
+function isValidContainerId(id) {
+  return typeof id === 'string' && CONTAINER_ID_RE.test(id);
+}
+
+// http.request over the unix socket does the HTTP framing for us; the previous hand-rolled
+// client concatenated the path into the request line and decoded chunked bodies per TCP
+// segment, losing data whenever a chunk straddled a boundary.
+function dockerRequest(method, apiPath, body = null) {
   return new Promise((resolve, reject) => {
-    const socket = net.connect({ path: '/var/run/docker.sock' }, () => {
-      let request = `${method} ${path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\nAccept: application/json\r\n`;
-      if (body) {
-        request += `Content-Type: application/json\r\nContent-Length: ${Buffer.byteLength(body)}\r\n`;
-      }
-      request += `\r\n`;
-      if (body) request += body;
-      socket.write(request);
-    });
+    const payload = body ? Buffer.from(body) : null;
+    const headers = { Host: 'localhost', Accept: 'application/json' };
+    if (payload) {
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = payload.length;
+    }
 
-    let headerBuffer = '';
-    let bodyBuffer = '';
-    let headersComplete = false;
-
-    socket.on('data', chunk => {
-      const str = chunk.toString();
-      if (!headersComplete) {
-        headerBuffer += str;
-        const headerEnd = headerBuffer.indexOf('\r\n\r\n');
-        if (headerEnd !== -1) {
-          headersComplete = true;
-          const bodyPart = headerBuffer.substring(headerEnd + 4);
-          headerBuffer = '';
-          bodyBuffer = decodeChunked(bodyPart);
+    const req = http.request({ socketPath: DOCKER_SOCKET, path: apiPath, method, headers }, (response) => {
+      let data = '';
+      response.setEncoding('utf8');
+      response.on('data', chunk => { data += chunk; });
+      response.on('end', () => {
+        const trimmed = data.trim();
+        if (!trimmed) return resolve(null);
+        try {
+          resolve(JSON.parse(trimmed));
+        } catch (e) {
+          reject(new Error(`Failed to parse Docker response: ${e.message}`));
         }
-      } else {
-        bodyBuffer += decodeChunked(str);
-      }
+      });
     });
 
-    socket.on('end', () => {
-      const trimmed = bodyBuffer.trim();
-      if (!trimmed) return resolve(null);
-      try {
-        resolve(JSON.parse(trimmed));
-      } catch (e) {
-        reject(new Error('Failed to parse Docker response: ' + e.message));
-      }
+    req.setTimeout(10000, () => {
+      req.destroy(new Error('Docker socket request timed out'));
     });
-
-    socket.on('error', () => reject(new Error('Docker socket error')));
+    req.on('error', (e) => reject(new Error(e.message || 'Docker socket error')));
+    if (payload) req.write(payload);
+    req.end();
   });
 }
 
-app.post('/api/docker/:id/start', async (req, res) => {
-  try {
-    const result = await dockerSocketRequest(`/containers/${req.params.id}/start`, 'POST');
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
+function containerAction(res, id, action) {
+  if (!isValidContainerId(id)) {
+    return res.status(400).json({ error: 'Invalid container id' });
   }
-});
-
-app.post('/api/docker/:id/stop', async (req, res) => {
-  try {
-    const result = await dockerSocketRequest(`/containers/${req.params.id}/stop`, 'POST');
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-app.post('/api/docker/:id/restart', async (req, res) => {
-  try {
-    const result = await dockerSocketRequest(`/containers/${req.params.id}/restart`, 'POST');
-    res.json({ success: true, result });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-function decodeChunked(data) {
-  let result = '';
-  let remaining = data;
-  
-  while (remaining.length > 0) {
-    const crlfIndex = remaining.indexOf('\r\n');
-    if (crlfIndex === -1) break;
-    
-    const chunkSizeLine = remaining.substring(0, crlfIndex);
-    const chunkSize = parseInt(chunkSizeLine, 16);
-    
-    if (isNaN(chunkSize) || chunkSize === 0) {
-      break;
-    }
-    
-    const chunkStart = crlfIndex + 2;
-    if (chunkStart + chunkSize > remaining.length) {
-      break;
-    }
-    
-    result += remaining.substring(chunkStart, chunkStart + chunkSize);
-    remaining = remaining.substring(chunkStart + chunkSize);
-    
-    const nextCrlf = remaining.indexOf('\r\n');
-    if (nextCrlf !== -1) {
-      remaining = remaining.substring(nextCrlf + 2);
-    }
-  }
-  
-  return result;
+  dockerRequest('POST', `/containers/${id}/${action}`)
+    .then(result => res.json({ success: true, result }))
+    .catch(e => res.status(500).json({ error: e.message }));
 }
+
+app.post('/api/docker/:id/start', (req, res) => containerAction(res, req.params.id, 'start'));
+
+app.post('/api/docker/:id/stop', (req, res) => containerAction(res, req.params.id, 'stop'));
+
+app.post('/api/docker/:id/restart', (req, res) => containerAction(res, req.params.id, 'restart'));
+
+// Each run moves 100MB down plus 10MB up to a third-party mirror, so results are cached
+// and concurrent callers share one in-flight run instead of multiplying the cost.
+const SPEEDTEST_TTL = 10 * 60 * 1000;
+let speedtestInFlight = null;
 
 app.get('/api/speedtest', async (req, res) => {
-  const start = Date.now();
+  const cached = cacheGet('speedtest', SPEEDTEST_TTL);
+  if (cached) return res.json(cached);
+
+  if (!speedtestInFlight) {
+    speedtestInFlight = runSpeedtest()
+      .finally(() => { speedtestInFlight = null; });
+  }
+  const result = await speedtestInFlight;
+  if (result.error) {
+    return res.json(result);
+  }
+  cacheSet('speedtest', result, SPEEDTEST_TTL);
+  res.json(result);
+});
+
+async function runSpeedtest() {
   const testUrls = [
     { url: 'https://speed.hetzner.de/100MB.bin', size: 100 },
     { url: 'https://speed.hetzner.de/10MB.bin', size: 10 },
@@ -477,19 +494,19 @@ app.get('/api/speedtest', async (req, res) => {
   }
 
   if (download) {
-    return res.json({
+    return {
       download,
       upload,
       duration: duration ? duration.toFixed(2) : null,
       url: usedUrl
-    });
+    };
   }
 
-  res.json({
+  return {
     error: 'Speed test failed. Check network or try again.',
     fallback: true
-  });
-});
+  };
+}
 
 function runSpeedTest(url, expectedSizeMB) {
   return new Promise((resolve, reject) => {
@@ -498,7 +515,9 @@ function runSpeedTest(url, expectedSizeMB) {
       reject(new Error('Timeout'));
     }, 20000);
 
-    https.get(url, { timeout: 15000, rejectUnauthorized: false }, (response) => {
+    // Certificate verification stays on: disabling it let a network-position attacker
+    // fabricate the throughput figures this widget reports.
+    https.get(url, { timeout: 15000 }, (response) => {
       if (response.statusCode !== 200) {
         clearTimeout(timeout);
         return reject(new Error(`HTTP ${response.statusCode}`));
@@ -576,6 +595,9 @@ app.get('/api/github/contributions', async (req, res) => {
   if (!user) {
     return res.json({ error: 'Missing user parameter', weeks: [] });
   }
+  if (!GITHUB_LOGIN_RE.test(String(user))) {
+    return res.status(400).json({ error: 'Invalid GitHub username', weeks: [] });
+  }
 
   try {
     const cacheKey = `github:contributions:${user}`;
@@ -584,8 +606,8 @@ app.get('/api/github/contributions', async (req, res) => {
       if (cached) return res.json(cached);
     }
 
-    const graphqlQuery = `query {
-      user(login: "${user}") {
+    const graphqlQuery = `query ($login: String!) {
+      user(login: $login) {
         avatarUrl
         name
         bio
@@ -614,12 +636,20 @@ app.get('/api/github/contributions', async (req, res) => {
       }
     }`;
 
-    const data = await makeGitHubGraphQLRequest(graphqlQuery);
+    // Variables rather than string interpolation, so ?user can never append fields to
+    // the document the dashboard issues with the operator's token.
+    const data = await makeGitHubGraphQLRequest(graphqlQuery, { login: user });
+    if (data.error) {
+      return res.json({ error: data.error, weeks: [] });
+    }
     if (data.errors) {
       return res.json({ error: data.errors[0].message, weeks: [] });
     }
+    if (!data.data || !data.data.user) {
+      return res.json({ error: `GitHub returned no data for user "${user}"`, weeks: [] });
+    }
 
-    const userData = data.data?.user || {};
+    const userData = data.data.user;
     const weeks = userData.contributionsCollection?.contributionCalendar?.weeks || [];
     const payload = {
       weeks,
@@ -644,9 +674,9 @@ app.get('/api/github/contributions', async (req, res) => {
   }
 });
 
-function makeGitHubGraphQLRequest(query) {
+function makeGitHubGraphQLRequest(query, variables = {}) {
   return new Promise((resolve, reject) => {
-    const postData = JSON.stringify({ query });
+    const postData = JSON.stringify({ query, variables });
     const headers = {
       'User-Agent': githubAgent,
       'Accept': 'application/json',
@@ -667,6 +697,18 @@ function makeGitHubGraphQLRequest(query) {
       let data = '';
       response.on('data', chunk => data += chunk);
       response.on('end', () => {
+        // GitHub reports a bad or revoked token as a 401 body with `message`/`status`
+        // and no `errors` array, which used to fall through as a successful empty result.
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          let message = `GitHub API error: ${response.statusCode}`;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed && parsed.message) message = `GitHub API error: ${response.statusCode} - ${parsed.message}`;
+          } catch (e) {
+            // Keep the status-only message.
+          }
+          return resolve({ error: message });
+        }
         try {
           resolve(JSON.parse(data));
         } catch (e) {
@@ -681,11 +723,22 @@ function makeGitHubGraphQLRequest(query) {
   });
 }
 
+// GitHub logins and repo names are interpolated into REST paths, so they are constrained
+// to the characters GitHub itself allows.
+const GITHUB_LOGIN_RE = /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/;
+const GITHUB_REPO_RE = /^[a-zA-Z0-9_.-]{1,100}$/;
+
 app.get('/api/github/activity', async (req, res) => {
   const user = req.query.user;
   const repo = req.query.repo;
   if (!user) {
     return res.json({ error: 'Missing user parameter', events: [] });
+  }
+  if (!GITHUB_LOGIN_RE.test(String(user))) {
+    return res.status(400).json({ error: 'Invalid GitHub username', events: [] });
+  }
+  if (repo && !GITHUB_REPO_RE.test(String(repo))) {
+    return res.status(400).json({ error: 'Invalid GitHub repository', events: [] });
   }
 
   try {
@@ -771,58 +824,6 @@ function makeGitHubRequest(path) {
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', uptime: os.uptime() });
 });
-
-function makeHttpRequest(hostname, port, path) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname,
-      port: port || 80,
-      path,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Custom-Dashboard',
-        'Accept': 'application/json'
-      },
-      timeout: 10000
-    };
-
-    console.log('UptimeKuma HTTP request:', hostname + ':' + (port || 80) + path);
-
-    const req = http.request(options, (response) => {
-      console.log('UptimeKuma HTTP status:', response.statusCode);
-      let data = '';
-      response.on('data', chunk => data += chunk);
-      response.on('end', () => {
-        console.log('UptimeKuma response length:', data.length);
-        if (response.statusCode === 404) {
-          resolve({ error: 'Status page not found' });
-        } else if (response.statusCode === 200) {
-          try {
-            resolve(JSON.parse(data));
-          } catch (e) {
-            console.error('UptimeKuma JSON parse error:', e.message, 'data preview:', data.substring(0, 200));
-            resolve({ error: 'Failed to parse response' });
-          }
-        } else {
-          resolve({ error: `HTTP ${response.statusCode}` });
-        }
-      });
-    });
-
-    req.on('error', (e) => {
-      console.error('UptimeKuma request error:', e.message, 'to', hostname + ':' + (port || 80) + path);
-      resolve({ error: 'Failed to connect to Uptime Kuma' });
-    });
-    
-    req.on('timeout', () => {
-      console.error('UptimeKuma request timeout:', hostname + ':' + (port || 80) + path);
-      req.destroy();
-      resolve({ error: 'Uptime Kuma request timed out' });
-    });
-    
-    req.end();
-  });
-}
 
 app.get('/api/network', (req, res) => {
   try {
@@ -932,9 +933,11 @@ app.get('/api/weather', async (req, res) => {
 });
 
 app.get('/api/docker/:id/stats', async (req, res) => {
-  const containerId = req.params.id;
+  if (!isValidContainerId(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid container id' });
+  }
   try {
-    const data = await dockerSocketRequest(`/containers/${containerId}/stats?stream=0`);
+    const data = await dockerRequest('GET', `/containers/${req.params.id}/stats?stream=0`);
     if (!data) {
       return res.json({ error: 'No stats available' });
     }
@@ -945,6 +948,9 @@ app.get('/api/docker/:id/stats', async (req, res) => {
 });
 
 const CONFIG_PATH = path.join(__dirname, 'public', 'data', 'config.json');
+// public/data is gitignored and absent from a fresh clone, so every write used to fail
+// with a generic 500 that hid the ENOENT underneath.
+const CONFIG_DIR = path.dirname(CONFIG_PATH);
 
 app.get('/api/config', (req, res) => {
   try {
@@ -954,35 +960,125 @@ app.get('/api/config', (req, res) => {
     const data = fs.readFileSync(CONFIG_PATH, 'utf8');
     res.json(JSON.parse(data));
   } catch (e) {
+    console.error(`[config] read failed (${e.code || e.message}): ${CONFIG_PATH} - fix by checking permissions on ${CONFIG_DIR}`);
     res.status(500).json({ error: 'Failed to read config' });
   }
 });
 
-app.post('/api/config', express.json(), (req, res) => {
+app.post('/api/config', (req, res) => {
   try {
     const payload = req.body;
-    if (!payload || typeof payload !== 'object') {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       return res.status(400).json({ error: 'Invalid config payload' });
     }
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(payload, null, 2), 'utf8');
+    if (Object.prototype.hasOwnProperty.call(payload, '__proto__') ||
+        Object.prototype.hasOwnProperty.call(payload, 'constructor')) {
+      return res.status(400).json({ error: 'Invalid config payload' });
+    }
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    // Write-then-rename so a crash mid-write cannot truncate the stored layout.
+    const tmpPath = CONFIG_PATH + '.tmp';
+    fs.writeFileSync(tmpPath, JSON.stringify(payload, null, 2), 'utf8');
+    fs.renameSync(tmpPath, CONFIG_PATH);
     res.json({ status: 'ok' });
   } catch (e) {
+    console.error(`[config] write failed (${e.code || e.message}): ${CONFIG_PATH} - fix by ensuring ${CONFIG_DIR} exists and is writable`);
     res.status(500).json({ error: 'Failed to write config' });
   }
 });
 
-app.get('/api/uptime-kuma', async (req, res) => {
-  const baseUrl = (req.query.baseUrl || process.env.UPTIME_KUMA_BASE_URL || 'http://192.168.4.90:3001').replace(/\/$/, '');
-  const slug = req.query.slug || process.env.UPTIME_KUMA_SLUG || '';
-  const apiKey = req.query.apiKey || process.env.UPTIME_KUMA_API_KEY || '';
-  const mode = req.query.mode || 'status';
+// Uptime Kuma and Pi-hole are reached by the server on the caller's behalf, so the
+// destination is chosen here, never from the request. A host is acceptable only if it is
+// in that integration's allow-list; a caller-supplied host is otherwise refused outright,
+// which is what stops this being an SSRF proxy for the network the server sits on.
+function buildUpstreamHosts(envName, allowEnvName, builtinDefault) {
+  const hosts = new Set();
+  const add = (value) => {
+    if (!value) return;
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        hosts.add(parsed.hostname.toLowerCase());
+      }
+    } catch (e) {
+      console.error(`[upstream] ignoring unparseable ${envName}: ${e.message}`);
+    }
+  };
+  add(process.env[envName]);
+  add(builtinDefault);
+  String(process.env[allowEnvName] || '').split(',').forEach(h => hosts.add(h.trim().toLowerCase()));
+  hosts.delete('');
+  return hosts;
+}
+
+function isPrivateHostname(hostname) {
+  const host = String(hostname).toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host === '::1') return true;
+  const type = net.isIP(host);
+  if (type === 4) {
+    const [a, b] = host.split('.').map(Number);
+    if (a === 10 || a === 127 || a === 0) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    if (a >= 224) return true;
+    return false;
+  }
+  if (type === 6) {
+    return host === '::1' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('::ffff:127.') || host.startsWith('::ffff:10.') || host.startsWith('::ffff:192.168.');
+  }
+  return false;
+}
+
+function resolveUpstreamUrl(rawUrl, allowedHosts, allowEnvName) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch (e) {
+    throw new Error('Invalid upstream URL');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Upstream URL must use http or https');
+  }
+  const hostname = parsed.hostname.toLowerCase();
+  if (!allowedHosts.has(hostname)) {
+    throw new Error(`Upstream host "${hostname}" is not allowed. Add it to ${allowEnvName} to permit it.`);
+  }
+  if (isPrivateHostname(hostname) && process.env.ALLOW_PRIVATE_UPSTREAM !== 'true') {
+    throw new Error(`Upstream host "${hostname}" is a private address. Set ALLOW_PRIVATE_UPSTREAM=true to permit it.`);
+  }
+  return `${parsed.origin}`;
+}
+
+const UPTIME_KUMA_DEFAULT = 'http://192.168.4.90:3001';
+const PIHOLE_DEFAULT = 'http://192.168.4.90';
+const UPTIME_KUMA_HOSTS = buildUpstreamHosts('UPTIME_KUMA_BASE_URL', 'UPTIME_KUMA_ALLOWED_HOSTS', UPTIME_KUMA_DEFAULT);
+const PIHOLE_HOSTS = buildUpstreamHosts('PIHOLE_BASE_URL', 'PIHOLE_ALLOWED_HOSTS', PIHOLE_DEFAULT);
+
+// Secrets are read from the server environment only. They are never accepted from the
+// request and never sent back to the browser, which is what keeps them out of proxy logs.
+const uptimeKumaApiKey = process.env.UPTIME_KUMA_API_KEY || '';
+const piholeSecret = process.env.PIHOLE_PASSWORD || process.env.PIHOLE_TOKEN || '';
+
+async function handleUptimeKuma(req, res) {
+  const requested = (req.body && req.body.baseUrl) || req.query.baseUrl;
+  const slug = (req.body && req.body.slug) || req.query.slug || process.env.UPTIME_KUMA_SLUG || '';
+  const mode = (req.body && req.body.mode) || req.query.mode || 'status';
+
+  let baseUrl;
+  try {
+    baseUrl = resolveUpstreamUrl(requested || process.env.UPTIME_KUMA_BASE_URL || UPTIME_KUMA_DEFAULT, UPTIME_KUMA_HOSTS, 'UPTIME_KUMA_ALLOWED_HOSTS');
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
 
   try {
-    if (mode === 'metrics' && apiKey) {
+    if (mode === 'metrics' && uptimeKumaApiKey) {
       const metricsUrl = `${baseUrl}/metrics`;
       const metricsRes = await fetch(metricsUrl, {
         headers: {
-          'Authorization': 'Basic ' + Buffer.from(':' + apiKey).toString('base64')
+          'Authorization': 'Basic ' + Buffer.from(':' + uptimeKumaApiKey).toString('base64')
         }
       });
       if (!metricsRes.ok) {
@@ -1074,21 +1170,32 @@ app.get('/api/uptime-kuma', async (req, res) => {
   } catch (e) {
     res.json({ error: 'Failed to connect to Uptime Kuma: ' + e.message });
   }
-});
+}
+
+app.get('/api/uptime-kuma', handleUptimeKuma);
+app.post('/api/uptime-kuma', handleUptimeKuma);
 
 const piholeSessionCache = new Map();
+const PIHOLE_CACHE_MAX = 50;
 let piholeCooldownUntil = 0;
 
-app.get('/api/pihole', async (req, res) => {
-  const baseUrl = (req.query.baseUrl || process.env.PIHOLE_BASE_URL || 'http://192.168.4.90').replace(/\/$/, '');
-  const secret = req.query.password || process.env.PIHOLE_PASSWORD || process.env.PIHOLE_TOKEN || '';
+async function handlePiHole(req, res) {
+  const requested = (req.body && req.body.baseUrl) || req.query.baseUrl;
+
+  let baseUrl;
+  try {
+    baseUrl = resolveUpstreamUrl(requested || process.env.PIHOLE_BASE_URL || PIHOLE_DEFAULT, PIHOLE_HOSTS, 'PIHOLE_ALLOWED_HOSTS');
+  } catch (e) {
+    return res.status(400).json({ error: e.message });
+  }
+
+  const secret = piholeSecret;
   const startTime = Date.now();
-  const cacheKey = `${baseUrl}:${secret}`;
-  console.log(`[Pi-hole] Request started: baseUrl=${baseUrl}, hasSecret=${!!secret}`);
+  // Hashed so the cache key never holds the password, and capped so it cannot grow forever.
+  const cacheKey = `${baseUrl}:${crypto.createHash('sha256').update(secret).digest('hex').slice(0, 16)}`;
 
   if (Date.now() < piholeCooldownUntil) {
     const remaining = Math.ceil((piholeCooldownUntil - Date.now()) / 1000);
-    console.log(`[Pi-hole] In cooldown (${remaining}s remaining), returning cached error`);
     return res.json({
       error: `Pi-hole API rate-limited (429). Retrying in ${remaining}s.`,
       retryAfter: piholeCooldownUntil - Date.now()
@@ -1182,34 +1289,28 @@ app.get('/api/pihole', async (req, res) => {
 
     if (secret) {
       if (session && sessionAge < SESSION_TTL && session.valid !== false) {
-        console.log(`[Pi-hole] Reusing cached session (age: ${(sessionAge / 1000).toFixed(0)}s)`);
         const headers = { 'Cookie': `sid=${session.jwt}` };
         if (session.csrf) headers['X-CSRF-TOKEN'] = session.csrf;
         const summaryResp = await jsonRequest(summaryUrl, { headers });
-        console.log(`[Pi-hole] Cached session attempt: status=${summaryResp.status}`);
         if (summaryResp.status === 200) {
           data = summaryResp.body;
           session.lastUsed = Date.now();
-          console.log(`[Pi-hole] Success via cached session after ${Date.now() - startTime}ms`);
           return sendSummary(res, data);
         }
         if (summaryResp.status === 429) {
           piholeCooldownUntil = Date.now() + 30000;
-          console.log(`[Pi-hole] Cached session 429, backing off 30s`);
           return res.json({
             error: `Pi-hole API rate-limited (429). Will retry in 30s.`,
             retryAfter: 30000
           });
         }
         if (summaryResp.status === 401) {
-          console.log(`[Pi-hole] Cached session 401, trying with fresh auth`);
           piholeSessionCache.delete(cacheKey);
         }
       }
 
       const backoff = session ? Math.min(30000, 5000 * Math.pow(1.5, session.consecutiveFailures || 0)) : 0;
       if (backoff > 0) {
-        console.log(`[Pi-hole] Backing off ${(backoff / 1000).toFixed(0)}s after ${session?.consecutiveFailures || 0} failures`);
         piholeCooldownUntil = Date.now() + backoff;
         session.consecutiveFailures = (session.consecutiveFailures || 0) + 1;
         return res.json({
@@ -1218,13 +1319,11 @@ app.get('/api/pihole', async (req, res) => {
         });
       }
 
-      console.log(`[Pi-hole] Authenticating via /api/auth`);
       const authResp = await jsonRequest(authUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: secret })
       });
-      console.log(`[Pi-hole] Auth result: status=${authResp.status}`);
       if (authResp.status === 429) {
         piholeCooldownUntil = Date.now() + 30000;
         const newSession = {
@@ -1233,8 +1332,11 @@ app.get('/api/pihole', async (req, res) => {
           consecutiveFailures: (session?.consecutiveFailures || 0) + 1,
           valid: false
         };
+        if (piholeSessionCache.size >= PIHOLE_CACHE_MAX) {
+          const oldest = piholeSessionCache.keys().next();
+          if (!oldest.done) piholeSessionCache.delete(oldest.value);
+        }
         piholeSessionCache.set(cacheKey, newSession);
-        console.log(`[Pi-hole] Auth 429, backing off 30s (failures: ${newSession.consecutiveFailures})`);
         return res.json({
           error: `Pi-hole API rate-limited (429). Will retry in 30s.`,
           retryAfter: 30000
@@ -1242,17 +1344,13 @@ app.get('/api/pihole', async (req, res) => {
       }
       if (authResp.status === 200) {
         const authData = authResp.body;
-        console.log(`[Pi-hole] Auth response body:`, JSON.stringify(authData).substring(0, 500));
         const sid = authData?.session?.sid;
         const token = authData?.session?.token;
         const csrf = authData?.session?.csrf;
-        console.log(`[Pi-hole] Auth fields: sid=${sid ? sid.substring(0, 8) + '...' : 'missing'}, token=${token ? token.substring(0, 8) + '...' : 'missing'}, csrf=${!!csrf}`);
         
         const cookieFromBody = sid ? `sid=${sid}` : null;
         const jwt = sid || token || authData?.token || null;
         
-        console.log(`[Pi-hole] Cookie from body: ${cookieFromBody ? cookieFromBody.substring(0, 20) + '...' : 'none'}`);
-        console.log(`[Pi-hole] Auth success: jwt=${jwt ? 'found' : 'missing'}, csrf=${!!csrf}`);
         
         if (jwt) {
           const cookieValue = cookieFromBody;
@@ -1264,6 +1362,10 @@ app.get('/api/pihole', async (req, res) => {
             lastUsed: Date.now(),
             consecutiveFailures: 0
           };
+          if (piholeSessionCache.size >= PIHOLE_CACHE_MAX) {
+            const oldest = piholeSessionCache.keys().next();
+            if (!oldest.done) piholeSessionCache.delete(oldest.value);
+          }
           piholeSessionCache.set(cacheKey, newSession);
           
           const attempts = [
@@ -1273,12 +1375,9 @@ app.get('/api/pihole', async (req, res) => {
           ];
           
           for (const attempt of attempts) {
-            console.log(`[Pi-hole] Attempt: ${attempt.name}`);
             const summaryResp = await jsonRequest(summaryUrl, { headers: attempt.headers });
-            console.log(`[Pi-hole] Summary result (${attempt.name}): status=${summaryResp.status}, body=${JSON.stringify(summaryResp.body).substring(0, 200)}`);
             if (summaryResp.status === 200) {
               data = summaryResp.body;
-              console.log(`[Pi-hole] Success via ${attempt.name} after ${Date.now() - startTime}ms`);
               return sendSummary(res, data);
             }
             if (summaryResp.status === 429) {
@@ -1290,30 +1389,29 @@ app.get('/api/pihole', async (req, res) => {
             }
           }
           
-          console.log(`[Pi-hole] All auth methods returned non-200, logging out and clearing`);
           try { await jsonRequest(`${baseUrl}/api/auth`, { method: 'DELETE' }); } catch (e) {}
           piholeSessionCache.delete(cacheKey);
         }
       }
     } else {
-      console.log(`[Pi-hole] No secret provided, attempting legacy endpoint`);
       const summaryResp = await jsonRequest(summaryUrl);
-      console.log(`[Pi-hole] Legacy attempt result: status=${summaryResp.status}`);
       if (summaryResp.status === 200) {
         data = summaryResp.body;
       }
     }
 
-    console.log(`[Pi-hole] All attempts failed after ${Date.now() - startTime}ms`);
     return res.json({
       error: `Pi-hole API failed for all endpoints`,
       retryAfter: 30000
     });
   } catch (e) {
-    console.error(`[Pi-hole] Unhandled error after ${Date.now() - startTime}ms:`, e.message);
+    console.error(`[Pi-hole] unhandled error after ${Date.now() - startTime}ms: ${e.message} - fix by checking Pi-hole reachability and PIHOLE_PASSWORD`);
     res.json({ error: 'Failed to connect to Pi-hole: ' + e.message });
   }
-});
+}
+
+app.get('/api/pihole', handlePiHole);
+app.post('/api/pihole', handlePiHole);
 
 function sendSummary(res, data) {
   let queries, blocked, forwarded, clients, percent;
@@ -1341,7 +1439,37 @@ function sendSummary(res, data) {
   });
 }
 
+// Malformed bodies arrive here from express.json(); log the shape once, never the stack,
+// so a burst of bad requests cannot flood stderr with framework paths.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    console.error(`[error] ${req.method} ${req.path} failed (${err.code || err.message}) - fix by checking the request body and server logs`);
+  } else {
+    console.warn(`[error] ${req.method} ${req.path} rejected with ${status}: ${err.type || err.message}`);
+  }
+  res.status(status).json({ error: status >= 500 ? 'Internal server error' : (err.message || 'Bad request') });
+});
+
+// Fail closed. Without this the app boots with no authentication at all, which previously
+// exposed container control and the upstream-proxy routes to anything that could reach
+// the port. An operator who really wants it open must opt in explicitly.
+if (!AUTH_ENABLED && !ALLOW_ANONYMOUS) {
+  console.error('Refusing to start: AUTH_USER and AUTH_PASS are not both set.');
+  console.error('Fix: set AUTH_USER and AUTH_PASS (e.g. in .env), or set ALLOW_ANONYMOUS=true to serve the dashboard without authentication.');
+  process.exit(1);
+}
+
+if (!ALLOW_ANONYMOUS && uptimeKumaApiKey) {
+  console.log('Uptime Kuma API key loaded from the environment and will only be used server-side.');
+}
+if (!ALLOW_ANONYMOUS && piholeSecret) {
+  console.log('Pi-hole credential loaded from the environment and will only be used server-side.');
+}
+
 app.listen(PORT, () => {
   console.log(`Dashboard running at http://localhost:${PORT}`);
+  console.log(`Authentication: ${AUTH_ENABLED ? `enabled for user "${AUTH_USER}"` : 'DISABLED (ALLOW_ANONYMOUS=true)'}`);
 });
 

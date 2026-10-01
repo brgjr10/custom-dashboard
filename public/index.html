@@ -23,6 +23,7 @@
           <button id="refresh-btn" class="btn btn-secondary" title="Refresh All">↻ Refresh</button>
           <button id="edit-mode-btn" class="btn btn-secondary" title="Toggle Edit Mode">✎ Edit</button>
           <button id="unit-toggle" class="btn btn-secondary unit-toggle" title="Toggle °C / °F">°C</button>
+          <label class="visually-hidden" for="theme-select">Theme</label>
           <select id="theme-select" class="theme-select" title="Choose theme">
             <option value="dark">Dark</option>
             <option value="light">Light</option>
@@ -37,6 +38,7 @@
             <option value="amber">Amber</option>
             <option value="neon">Neon</option>
           </select>
+          <label class="visually-hidden" for="refresh-rate-select">Dashboard refresh rate</label>
           <select id="refresh-rate-select" class="theme-select" title="Dashboard refresh rate">
             <option value="5000">5s</option>
             <option value="15000">15s</option>
@@ -50,9 +52,9 @@
       </div>
     </header>
 
-    <div class="widget-grid" id="widget-grid">
+    <main class="widget-grid" id="widget-grid">
       <!-- Widgets render here -->
-    </div>
+    </main>
 
     <div class="add-widget-panel" id="add-widget-panel" style="display: none;">
       <div class="panel-header">

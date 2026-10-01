@@ -12,6 +12,9 @@ import {
   addWidget,
   removeWidget,
   updateWidget,
+  saveConfig,
+  escapeHtml,
+  sanitizeUrl,
   WIDGET_TYPES
 } from './config.js';
 import { WIDGET_CLASSES } from './widgets.js';
@@ -902,8 +905,8 @@ function renderIconPicker() {
   if (!picker) return;
   
   picker.innerHTML = FONT_AWESOME_ICONS.map(icon => `
-    <button class="icon-option" type="button" data-icon-class="${icon.class}" title="${icon.label}">
-      <i class="${icon.class}"></i>
+    <button class="icon-option" type="button" data-icon-class="${escapeHtml(icon.class)}" title="${escapeHtml(icon.label)}">
+      <i class="${escapeHtml(icon.class)}" aria-hidden="true"></i>
     </button>
   `).join('');
 }
@@ -953,13 +956,15 @@ function renderLinkEditorList() {
   }
   
   list.innerHTML = currentLinks.map((link, index) => {
-    const icon = link.icon ? (link.icon.startsWith('fa-') ? `<i class="${link.icon}"></i>` : link.icon) : '🔗';
+    const icon = link.icon ? (link.icon.startsWith('fa-') ? `<i class="${escapeHtml(link.icon)}" aria-hidden="true"></i>` : escapeHtml(link.icon)) : '🔗';
     return `
       <div class="link-editor-item" data-index="${index}">
         <button class="icon-picker-btn" type="button" data-index="${index}">${icon}</button>
-        <input type="text" class="link-label-input" value="${link.label || ''}" placeholder="Label" data-field="label">
-        <input type="text" class="link-url-input" value="${link.url || ''}" placeholder="https://..." data-field="url">
-        <button class="link-delete-btn" data-action="delete" title="Delete">×</button>
+        <label class="visually-hidden" for="link-label-${index}">Label</label>
+        <input id="link-label-${index}" type="text" class="link-label-input" value="${escapeHtml(link.label)}" placeholder="Label" data-field="label">
+        <label class="visually-hidden" for="link-url-${index}">URL</label>
+        <input id="link-url-${index}" type="text" class="link-url-input" value="${escapeHtml(link.url)}" placeholder="https://..." data-field="url">
+        <button class="link-delete-btn" data-action="delete" title="Delete" aria-label="Delete link">×</button>
       </div>
     `;
   }).join('');

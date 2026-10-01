@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   dashboard:
     build: .
@@ -16,3 +14,11 @@ services:
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - AUTH_USER=${AUTH_USER:-}
       - AUTH_PASS=${AUTH_PASS:-}
+      # Explicitly off: the app refuses to start without credentials otherwise.
+      - ALLOW_ANONYMOUS=${ALLOW_ANONYMOUS:-false}
+      - UPTIME_KUMA_API_KEY=${UPTIME_KUMA_API_KEY:-}
+      - PIHOLE_PASSWORD=${PIHOLE_PASSWORD:-}
+      - PIHOLE_BASE_URL=${PIHOLE_BASE_URL:-}
+      - UPTIME_KUMA_BASE_URL=${UPTIME_KUMA_BASE_URL:-}
+      # Both default integrations live on the LAN, so private upstreams must be permitted.
+      - ALLOW_PRIVATE_UPSTREAM=${ALLOW_PRIVATE_UPSTREAM:-true}

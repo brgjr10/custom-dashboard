@@ -192,7 +192,6 @@ export const DEFAULT_CONFIG = {
       order: 10,
       baseUrl: 'http://192.168.4.90:3001',
       slug: 'connection',
-      apiKey: 'uk3_CnaWzToZRDSGiY1gHL0LwhytI_grmbaEwy0GXVJd',
       mode: 'metrics'
     },
     {
@@ -218,8 +217,7 @@ export const DEFAULT_CONFIG = {
       enabled: true,
       order: 13,
       refreshInterval: 30000,
-      baseUrl: 'http://192.168.4.90',
-      password: 'da7ghuwmp8vs'
+      baseUrl: 'http://192.168.4.90'
     }
   ]
 };
@@ -295,6 +293,25 @@ export const WIDGET_TYPES = {
 
 export let config = null;
 
+// Every value that reaches an innerHTML sink comes from config, localStorage or an API
+// response, so it is escaped here rather than trusted at each call site.
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// Only http(s) links are rendered; javascript: and data: are dropped.
+export function sanitizeUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (/^(https?:)?\/\//i.test(raw)) return raw;
+  if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(raw)) return `http://${raw}`;
+  return '#';
+}
+
 export function loadConfig() {
   try {
     const saved = localStorage.getItem('dashboard-config');
@@ -304,6 +321,17 @@ export function loadConfig() {
       throw new Error('No local config');
     }
   } catch (e) {
+    // A truncated write must not silently overwrite a hand-arranged layout, so the bad
+    // value is preserved under a dated key before the defaults are restored.
+    console.warn(`[config] stored layout was unreadable (${e.message}); keeping a copy at dashboard-config.corrupt.${Date.now()}`);
+    const corruptKey = `dashboard-config.corrupt.${Date.now()}`;
+    try {
+      const raw = localStorage.getItem('dashboard-config');
+      if (raw) localStorage.setItem(corruptKey, raw);
+      localStorage.removeItem('dashboard-config');
+    } catch (e2) {
+      console.error('[config] could not preserve the unreadable layout:', e2);
+    }
     config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
   }
   if (!config.theme) {
@@ -447,7 +475,7 @@ export function migrateLayoutToGrid() {
 export function getWidgets() {
   if (!config || !config.widgets) return [];
   return config.widgets
-    .filter(w => w.enabled !== false)
+    .filter(w => w && typeof w === 'object' && w.enabled !== false)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 }
 
@@ -484,9 +512,24 @@ export function removeWidget(id) {
   }
 }
 
-export function addWidget(widgetConfig) {
-  config.widgets.push(widgetConfig);
+// Called as addWidget(type, overrides): the id, title and grid position are generated here
+// so every widget type gets a well-formed entry instead of a bare type string.
+export function addWidget(type, overrides = {}) {
+  if (!config) config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+  if (!Array.isArray(config.widgets)) config.widgets = [];
+  const typeInfo = WIDGET_TYPES[type] || { name: type };
+  const widget = {
+    id: `${type}-${Date.now()}`,
+    type,
+    title: typeInfo.name || type,
+    enabled: true,
+    order: config.widgets.length,
+    refreshInterval: 30000,
+    ...overrides
+  };
+  config.widgets.push(widget);
   saveConfig();
+  return widget;
 }
 
 export function setTheme(theme) {
