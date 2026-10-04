@@ -2,7 +2,7 @@
 
 A configurable, real-time home server dashboard with modular widgets, drag-and-drop layout, and 12 built-in themes. Built for reliability, readability, and speed.
 
-<img width="1204" height="1079" alt="Dashboard" src="https://github.com/user-attachments/assets/cbf3c155-ef21-4cb8-997e-b5acb2b53fb2" />
+<img width="1280" height="640" alt="image" src="https://github.com/user-attachments/assets/900a0f16-423d-44e9-aeb9-9cb924b46b95" />
 <img width="814" height="1079" alt="Dashboard mobile" src="https://github.com/user-attachments/assets/31603cd8-f20a-4a44-9e15-87893399ea11" />
 
 ## Why it exists
